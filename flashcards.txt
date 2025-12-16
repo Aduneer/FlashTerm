@@ -1,0 +1,7 @@
+What is the capital of France?,Paris,capitals,4,1
+What is the capital of Germany?,Berlin,capitals,4,1
+What is the capital of France?,Paris,geography;europe,4,0
+Who developed the theory of relativity?,Albert Einstein,science;physicist,3,3
+Largest planet in our solar system?,Jupiter,science;astronomy,3,2
+What's 2 + 2?,4,math,4,0
+Python list comprehension syntax?,[x for x in iterable],programming;python,2,4

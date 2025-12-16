@@ -46,7 +46,12 @@ When you run the application, you will see a menu with the following options:
 
 1.  **Add flashcard**: Prompts for a question and an answer to create a new flashcard.
 2.  **Review flashcards**: Quizzes you on your existing flashcards in a random order.
-3.  **Save and exit**: Saves all flashcards to `flashcards.txt` and terminates the program.
+3.  **Manage flashcards**: List, Edit or Delete flashcards.
+4.  **Display progress**: Shows you an overview of Correct/Incorrect, along with %.
+5.  **Import flashcards**: Allows you to import .csv flashcards.
+6.  **Export flashcards**: Allows you to export your questions as .csv.
+7.  **Manage Tags**: Allows you to modify question tags.
+0.  **Save and exit**: Saves all flashcards to `flashcards.txt` and terminates the program.
 
 ## Contributing
 

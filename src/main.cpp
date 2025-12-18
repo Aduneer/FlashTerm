@@ -5,12 +5,10 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
-// #include <locale>
 #include <random>
 #include <set>
-// #include <sstream>
-// #include <stdexcept>
 #include <vector>
+// removed redundant libraries
 
 const std::string FILENAME = "flashcards.txt";
 
@@ -42,7 +40,7 @@ std::string normalize_string(const std::string &str) {
   std::transform(temp.begin(), temp.end(), temp.begin(),
                  [](unsigned char c) { return std::tolower(c); });
 
-  // 3. REMOVE ALL REMAINING WHITESPACE
+  // 3. REMOVE ALL REMAINING WHITESPACE (hopefully)
   temp.erase(std::remove_if(temp.begin(), temp.end(),
                             [](unsigned char ch) { return std::isspace(ch); }),
              temp.end());
@@ -93,7 +91,6 @@ void review_flashcards(std::vector<Flashcard> &cards) {
     std::string filter_tags_str;
     std::getline(std::cin, filter_tags_str);
 
-    // Uses the utility function from utils.h/utils.cpp
     filter_tags = split_string_by_delimiter(filter_tags_str, ';');
 
   } else if (mode == 3) {
@@ -160,7 +157,7 @@ void review_flashcards(std::vector<Flashcard> &cards) {
     std::string user_answer;
     std::getline(std::cin, user_answer);
 
-    // --- SMART VALIDATION CHECK ---
+    // --- "SMART" VALIDATION CHECK ---
     std::string normalized_user_answer = normalize_string(user_answer);
     std::string normalized_correct_answer = normalize_string(card.answer);
 
@@ -174,7 +171,6 @@ void review_flashcards(std::vector<Flashcard> &cards) {
       card.times_incorrect++;
       wrong_total++;
     }
-    // --- END SMART VALIDATION CHECK ---
   }
 
   int total = correct_total + wrong_total;
@@ -255,7 +251,7 @@ void delete_flashcard(std::vector<Flashcard> &cards) {
   }
 }
 
-// Manage flashcards (list, edit, delete)
+// Manage flashcards menu (list, edit, delete)
 void manage_flashcards(std::vector<Flashcard> &cards) {
   while (true) {
     std::cout << "1. List flashcards\n"
@@ -280,7 +276,6 @@ void manage_flashcards(std::vector<Flashcard> &cards) {
   }
 }
 
-// NEW: Dedicated Tag Management feature
 void list_all_unique_tags(const std::vector<Flashcard> &cards) {
   if (cards.empty()) {
     std::cout << COLOR_YELLOW
@@ -347,7 +342,7 @@ void print_help() {
                "4 - Display progress\n"
                "5 - Import flashcards (.csv/.txt)\n"
                "6 - Export flashcards (.csv)\n"
-               "7 - Manage Tags (list all unique tags)\n" // NEW
+               "7 - Manage Tags (list all unique tags)\n"
                "0 - Save and exit\n"
                "h/? - Show this help screen\n"
             << COLOR_RESET << "\n";
@@ -363,7 +358,7 @@ int main() {
               << "4. Display progress\n"
               << "5. Import flashcards\n"
               << "6. Export flashcards\n"
-              << "7. Manage Tags\n" // NEW
+              << "7. Manage Tags\n"
               << "0. Save and exit\n"
               << "h/? Help\n"
               << "Choose: " << COLOR_RESET;
@@ -388,7 +383,7 @@ int main() {
       std::string export_path;
       std::getline(std::cin, export_path);
       export_flashcards(cards, export_path);
-    } else if (input == "7") { // NEW
+    } else if (input == "7") {
       list_all_unique_tags(cards);
     } else if (input == "0") {
       save_flashcards(FILENAME, cards);

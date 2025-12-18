@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-// NEW: Centralized utility function for splitting strings
+// Centralized utility function for splitting strings
 std::vector<std::string> split_string_by_delimiter(const std::string &str,
                                                    char delimiter) {
   std::vector<std::string> parts;

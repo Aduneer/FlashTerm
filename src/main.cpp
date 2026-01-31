@@ -2,32 +2,38 @@
 #include "utils.h"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <set>
 #include <vector>
-// removed redundant libraries
 
 const std::string FILENAME = "flashcards.txt";
 
-// Utility to get valid integer input
+void clear_screen() {
+#ifdef _WIN32
+  system("cls");
+#else
+  system("clear");
+#endif
+}
+
 int get_int_input() {
   std::string input;
   std::getline(std::cin, input);
   try {
     return std::stoi(input);
   } catch (const std::exception &) {
-    return -1; // Indicate failure
+    return -1;
   }
 }
 
-// Helper function for smart answer validation
 std::string normalize_string(const std::string &str) {
   std::string temp = str;
 
-  // 1. Trim leading and trailing whitespace
   temp.erase(temp.begin(),
              std::find_if(temp.begin(), temp.end(),
                           [](unsigned char ch) { return !std::isspace(ch); }));
@@ -36,11 +42,9 @@ std::string normalize_string(const std::string &str) {
                  .base(),
              temp.end());
 
-  // 2. Convert to lowercase
   std::transform(temp.begin(), temp.end(), temp.begin(),
                  [](unsigned char c) { return std::tolower(c); });
 
-  // 3. REMOVE ALL REMAINING WHITESPACE (hopefully)
   temp.erase(std::remove_if(temp.begin(), temp.end(),
                             [](unsigned char ch) { return std::isspace(ch); }),
              temp.end());
@@ -48,24 +52,25 @@ std::string normalize_string(const std::string &str) {
   return temp;
 }
 
-// Add a flashcard (with tags)
 void add_flashcard(std::vector<Flashcard> &cards) {
   std::string q, a, tags_str;
-  std::cout << "Enter question: ";
+  std::cout << "Enter question (or 'q' to go back): ";
   std::getline(std::cin, q);
+  if (q == "q" || q == "Q") {
+    return;
+  }
+
   std::cout << "Enter answer: ";
   std::getline(std::cin, a);
   std::cout << "Enter tags (semicolon-separated, e.g. math;science): ";
   std::getline(std::cin, tags_str);
 
-  // Uses the utility function from utils.h/utils.cpp
   std::vector<std::string> tags = split_string_by_delimiter(tags_str, ';');
 
   cards.emplace_back(q, a, tags);
   std::cout << COLOR_GREEN << "Flashcard added!" << COLOR_RESET << "\n\n";
 }
 
-// Review flashcards (shuffled, progress tracked), with optional tag filtering
 void review_flashcards(std::vector<Flashcard> &cards) {
   if (cards.empty()) {
     std::cout << COLOR_YELLOW << "No flashcards to review. Add some first!\n\n"
@@ -77,10 +82,15 @@ void review_flashcards(std::vector<Flashcard> &cards) {
             << "1. Review ALL cards\n"
             << "2. Review by TAGS\n"
             << "3. Review DIFFICULT cards (incorrect > correct)\n"
+            << "q. go back\n"
             << "Choose review mode: " << COLOR_RESET;
 
   std::string mode_input;
   std::getline(std::cin, mode_input);
+  if (mode_input == "q" || mode_input == "Q") {
+    clear_screen();
+    return;
+  }
   int mode = (mode_input.empty()) ? 0 : mode_input[0] - '0';
 
   std::vector<std::string> filter_tags;
@@ -103,20 +113,17 @@ void review_flashcards(std::vector<Flashcard> &cards) {
               << COLOR_RESET;
   }
 
-  // Create references to the original Flashcard objects that match the filter
   std::vector<std::reference_wrapper<Flashcard>> shuffled_refs;
 
   for (auto &card : cards) {
     bool include_card = true;
 
-    // Apply difficulty filter first (if enabled)
     if (filter_by_difficulty) {
       if (card.times_incorrect <= card.times_correct) {
         include_card = false;
       }
     }
 
-    // Apply tag filter (if enabled and card is not already excluded)
     if (include_card && !filter_tags.empty()) {
       bool has_filter_tag = false;
       for (const auto &filter_tag : filter_tags) {
@@ -143,7 +150,6 @@ void review_flashcards(std::vector<Flashcard> &cards) {
     return;
   }
 
-  // Shuffle the references to the original cards
   std::random_device rd;
   std::mt19937 g(rd());
   std::shuffle(shuffled_refs.begin(), shuffled_refs.end(), g);
@@ -151,13 +157,12 @@ void review_flashcards(std::vector<Flashcard> &cards) {
   int correct_total = 0, wrong_total = 0;
 
   for (auto ref : shuffled_refs) {
-    Flashcard &card = ref.get(); // Get the reference to the original card
+    Flashcard &card = ref.get();
     std::cout << COLOR_CYAN << "Q: " << card.question
               << "\nYour answer: " << COLOR_RESET;
     std::string user_answer;
     std::getline(std::cin, user_answer);
 
-    // --- "SMART" VALIDATION CHECK ---
     std::string normalized_user_answer = normalize_string(user_answer);
     std::string normalized_correct_answer = normalize_string(card.answer);
 
@@ -186,7 +191,6 @@ void review_flashcards(std::vector<Flashcard> &cards) {
             << COLOR_RESET;
 }
 
-// List all flashcards with tags
 void list_flashcards(const std::vector<Flashcard> &cards) {
   if (cards.empty()) {
     std::cout << COLOR_YELLOW << "No flashcards to display.\n\n" << COLOR_RESET;
@@ -202,7 +206,6 @@ void list_flashcards(const std::vector<Flashcard> &cards) {
   std::cout << "\n";
 }
 
-// Edit a flashcard
 void edit_flashcard(std::vector<Flashcard> &cards) {
   list_flashcards(cards);
   if (cards.empty())
@@ -226,7 +229,6 @@ void edit_flashcard(std::vector<Flashcard> &cards) {
     if (!a.empty())
       card.answer = a;
     if (!tags_str.empty()) {
-      // Uses the utility function from utils.h/utils.cpp
       card.tags = split_string_by_delimiter(tags_str, ';');
     }
     std::cout << COLOR_GREEN << "Flashcard updated!\n\n" << COLOR_RESET;
@@ -235,7 +237,6 @@ void edit_flashcard(std::vector<Flashcard> &cards) {
   }
 }
 
-// Delete a flashcard
 void delete_flashcard(std::vector<Flashcard> &cards) {
   list_flashcards(cards);
   if (cards.empty())
@@ -251,23 +252,25 @@ void delete_flashcard(std::vector<Flashcard> &cards) {
   }
 }
 
-// Manage flashcards menu (list, edit, delete)
 void manage_flashcards(std::vector<Flashcard> &cards) {
   while (true) {
     std::cout << "1. List flashcards\n"
               << "2. Edit a flashcard\n"
               << "3. Delete a flashcard\n"
-              << "4. Return to main menu\n"
+              << "q. Return to main menu\n"
               << COLOR_CYAN << "Choose: " << COLOR_RESET;
-    int choice = get_int_input();
+    std::string choice;
+    std::cin >> choice;
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    clear_screen();
 
-    if (choice == 1) {
+    if (choice == "1") {
       list_flashcards(cards);
-    } else if (choice == 2) {
+    } else if (choice == "2") {
       edit_flashcard(cards);
-    } else if (choice == 3) {
+    } else if (choice == "3") {
       delete_flashcard(cards);
-    } else if (choice == 4) {
+    } else if (choice == "q" || choice == "Q") {
       break;
     } else {
       std::cout << COLOR_RED << "Invalid choice. Please try again.\n"
@@ -307,32 +310,46 @@ void list_all_unique_tags(const std::vector<Flashcard> &cards) {
   std::cout << "\n";
 }
 
-// Show progress statistics
 void display_progress(const std::vector<Flashcard> &cards) {
   if (cards.empty()) {
     std::cout << COLOR_YELLOW << "No flashcards to display progress for.\n\n"
               << COLOR_RESET;
     return;
   }
-  std::cout << std::left << std::setw(30) << "Question" << std::setw(15)
-            << "Correct" << std::setw(15) << "Incorrect" << std::setw(15)
-            << "Success (%)"
-            << "\n"
-            << std::string(75, '-') << "\n";
+
+  int term_width = get_terminal_width();
+  int q_width =
+      std::max(10, term_width - 50); // Allocate remaining width to questions
+  const int num_width = 12;
+
+  // Header
+  std::cout << std::left << std::setw(q_width) << "Question" << std::right
+            << std::setw(num_width) << "Correct" << std::setw(num_width)
+            << "Incorrect" << std::setw(num_width) << "Success (%)" << "\n"
+            << std::string(term_width, '-') << "\n";
+
+  // Data
   for (const auto &card : cards) {
     int total = card.times_correct + card.times_incorrect;
     double success_rate =
         (total == 0)
             ? 0.0
             : (static_cast<double>(card.times_correct) / total) * 100.0;
-    std::cout << std::left << std::setw(30) << card.question << std::setw(15)
-              << card.times_correct << std::setw(15) << card.times_incorrect
-              << std::fixed << std::setprecision(2) << success_rate << "\n";
+
+    std::string q_truncated = card.question;
+    if (q_truncated.length() > static_cast<size_t>(q_width)) {
+      q_truncated = q_truncated.substr(0, q_width - 3) + "...";
+    }
+
+    std::cout << std::left << std::setw(q_width) << q_truncated << std::right
+              << std::setw(num_width) << card.times_correct
+              << std::setw(num_width) << card.times_incorrect << std::fixed
+              << std::setprecision(2) << std::setw(num_width) << success_rate
+              << "\n";
   }
   std::cout << "\n";
 }
 
-// Help screen
 void print_help() {
   std::cout << COLOR_YELLOW
             << "Commands:\n"
@@ -364,6 +381,7 @@ int main() {
               << "Choose: " << COLOR_RESET;
     std::string input;
     std::getline(std::cin, input);
+    clear_screen();
 
     if (input == "1") {
       add_flashcard(cards);

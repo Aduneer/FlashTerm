@@ -4,9 +4,19 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include <vector>
 
-// Centralized utility function for splitting strings
+int get_terminal_width() {
+  if (isatty(STDOUT_FILENO)) {
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    return w.ws_col;
+  }
+  return 80; // Default width if not a TTY
+}
+
 std::vector<std::string> split_string_by_delimiter(const std::string &str,
                                                    char delimiter) {
   std::vector<std::string> parts;
@@ -37,7 +47,6 @@ std::vector<Flashcard> load_flashcards(const std::string &filename) {
     std::getline(ss, correct_str, ',');
     std::getline(ss, incorrect_str, ',');
 
-    // Refactored to use the new utility
     std::vector<std::string> tags = split_string_by_delimiter(tags_str, ';');
 
     int correct = 0;
@@ -87,7 +96,6 @@ void import_flashcards(std::vector<Flashcard> &cards,
     if (std::getline(iss, question, ',') && std::getline(iss, answer, ',') &&
         std::getline(iss, tags_str)) {
 
-      // Refactored to use the new utility
       std::vector<std::string> tags = split_string_by_delimiter(tags_str, ';');
 
       cards.emplace_back(question, answer, tags);

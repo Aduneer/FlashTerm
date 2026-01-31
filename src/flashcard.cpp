@@ -1,5 +1,3 @@
-// flashcard.cpp
-
 #include "flashcard.h"
 
 Flashcard::Flashcard(const std::string &q, const std::string &a,

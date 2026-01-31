@@ -1,5 +1,3 @@
-// utils.h
-
 #pragma once
 #include "flashcard.h"
 #include <iostream>
@@ -25,3 +23,5 @@ void export_flashcards(const std::vector<Flashcard> &cards,
 
 std::vector<std::string> split_string_by_delimiter(const std::string &str,
                                                    char delimiter);
+
+int get_terminal_width();

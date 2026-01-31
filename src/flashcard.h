@@ -1,4 +1,3 @@
-// flashcard.h
 #pragma once
 #include <string>
 #include <vector>

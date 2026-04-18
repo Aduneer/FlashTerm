@@ -1,23 +1,27 @@
 #include "utils.h"
-#include "flashcard.h"
+
+#include <sys/ioctl.h>
+#include <unistd.h>
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <sys/ioctl.h>
-#include <unistd.h>
 #include <vector>
 
+#include "flashcard.h"
+
+namespace FlashTerm {
 int get_terminal_width() {
   if (isatty(STDOUT_FILENO)) {
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     return w.ws_col;
   }
-  return 80; // Default width if not a TTY
+  return 80;  // Default width if not a TTY
 }
 
-std::vector<std::string> split_string_by_delimiter(const std::string &str,
+std::vector<std::string> split_string_by_delimiter(const std::string& str,
                                                    char delimiter) {
   std::vector<std::string> parts;
   if (str.empty()) {
@@ -31,7 +35,7 @@ std::vector<std::string> split_string_by_delimiter(const std::string &str,
   return parts;
 }
 
-std::vector<Flashcard> load_flashcards(const std::string &filename) {
+std::vector<Flashcard> load_flashcards(const std::string& filename) {
   std::vector<Flashcard> cards;
   std::ifstream file(filename);
   if (!file.is_open()) {
@@ -53,7 +57,7 @@ std::vector<Flashcard> load_flashcards(const std::string &filename) {
     if (!correct_str.empty()) {
       try {
         correct = std::stoi(correct_str);
-      } catch (const std::invalid_argument &) {
+      } catch (const std::invalid_argument&) {
         // keep default
       }
     }
@@ -61,7 +65,7 @@ std::vector<Flashcard> load_flashcards(const std::string &filename) {
     if (!incorrect_str.empty()) {
       try {
         incorrect = std::stoi(incorrect_str);
-      } catch (const std::invalid_argument &) {
+      } catch (const std::invalid_argument&) {
         // keep default
       }
     }
@@ -71,17 +75,17 @@ std::vector<Flashcard> load_flashcards(const std::string &filename) {
   return cards;
 }
 
-void save_flashcards(const std::string &filename,
-                     const std::vector<Flashcard> &cards) {
+void save_flashcards(const std::string& filename,
+                     const std::vector<Flashcard>& cards) {
   std::ofstream file(filename);
-  for (const auto &card : cards) {
+  for (const auto& card : cards) {
     file << card.question << "," << card.answer << "," << card.tags_to_string()
          << "," << card.times_correct << "," << card.times_incorrect << "\n";
   }
 }
 
-void import_flashcards(std::vector<Flashcard> &cards,
-                       const std::string &filename) {
+void import_flashcards(std::vector<Flashcard>& cards,
+                       const std::string& filename) {
   std::ifstream file(filename);
   if (!file) {
     std::cout << COLOR_RED << "Failed to open file: " << filename << COLOR_RESET
@@ -95,7 +99,6 @@ void import_flashcards(std::vector<Flashcard> &cards,
     std::string question, answer, tags_str;
     if (std::getline(iss, question, ',') && std::getline(iss, answer, ',') &&
         std::getline(iss, tags_str)) {
-
       std::vector<std::string> tags = split_string_by_delimiter(tags_str, ';');
 
       cards.emplace_back(question, answer, tags);
@@ -107,15 +110,15 @@ void import_flashcards(std::vector<Flashcard> &cards,
             << std::endl;
 }
 
-void export_flashcards(const std::vector<Flashcard> &cards,
-                       const std::string &filename) {
+void export_flashcards(const std::vector<Flashcard>& cards,
+                       const std::string& filename) {
   std::ofstream file(filename);
   if (!file) {
     std::cout << COLOR_RED << "Failed to write to: " << filename << COLOR_RESET
               << std::endl;
     return;
   }
-  for (const auto &card : cards) {
+  for (const auto& card : cards) {
     file << card.question << "," << card.answer << "," << card.tags_to_string()
          << "\n";
   }
@@ -123,3 +126,4 @@ void export_flashcards(const std::vector<Flashcard> &cards,
             << filename << COLOR_RESET << std::endl
             << std::endl;
 }
+}  // namespace FlashTerm

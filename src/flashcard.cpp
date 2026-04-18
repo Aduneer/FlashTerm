@@ -1,9 +1,13 @@
 #include "flashcard.h"
 
-Flashcard::Flashcard(const std::string &q, const std::string &a,
-                     const std::vector<std::string> &t, int correct,
+namespace FlashTerm {
+Flashcard::Flashcard(const std::string& q, const std::string& a,
+                     const std::vector<std::string>& t, int correct,
                      int incorrect)
-    : question(q), answer(a), tags(t), times_correct(correct),
+    : question(q),
+      answer(a),
+      tags(t),
+      times_correct(correct),
       times_incorrect(incorrect) {}
 
 std::string Flashcard::tags_to_string() const {
@@ -16,3 +20,4 @@ std::string Flashcard::tags_to_string() const {
   }
   return result;
 }
+}  // namespace FlashTerm

@@ -1,7 +1,5 @@
-What is the capital of France?,Paris,capitals,1,0
-What is the capital of Germany?,Berlin,capitals,1,0
-Who developed the theory of relativity?,Albert Einstein,science;physicist,1,0
-Largest planet in our solar system?,Jupiter,science;astronomy,0,1
-What's 2 + 2?,4,math,1,1
-Python list comprehension syntax?,[x for x in iterable],programming;python,1,1
-What is the capital of Canada?,Ottawa,capitals,1,0
+What is the capital of France?,Paris,geography;europe,0,0
+Who developed the theory of relativity?,Albert Einstein,science;physicist,0,0
+Largest planet in our solar system?,Jupiter,science;astronomy,0,0
+What's 2 + 2 - 1?,3,quickmaths,0,0
+Python list comprehension syntax?,[x for x in iterable],programming;python,0,0

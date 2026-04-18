@@ -1,15 +1,17 @@
-#include "flashcard.h"
-#include "utils.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <functional>
 #include <iomanip>
 #include <iostream>
-#include <limits>
 #include <random>
 #include <set>
 #include <vector>
+
+#include "flashcard.h"
+#include "utils.h"
+
+using namespace FlashTerm;
 
 const std::string FILENAME = "flashcards.txt";
 
@@ -26,12 +28,12 @@ int get_int_input() {
   std::getline(std::cin, input);
   try {
     return std::stoi(input);
-  } catch (const std::exception &) {
+  } catch (const std::exception&) {
     return -1;
   }
 }
 
-std::string normalize_string(const std::string &str) {
+std::string normalize_string(const std::string& str) {
   std::string temp = str;
 
   temp.erase(temp.begin(),
@@ -52,9 +54,10 @@ std::string normalize_string(const std::string &str) {
   return temp;
 }
 
-void add_flashcard(std::vector<Flashcard> &cards) {
+void add_flashcard(std::vector<Flashcard>& cards) {
   std::string q, a, tags_str;
-  std::cout << "Enter question (or 'q' to go back): ";
+  std::cout << COLOR_YELLOW
+            << "Enter question (or 'q' to go back): " << COLOR_RESET;
   std::getline(std::cin, q);
   if (q == "q" || q == "Q") {
     return;
@@ -71,7 +74,7 @@ void add_flashcard(std::vector<Flashcard> &cards) {
   std::cout << COLOR_GREEN << "Flashcard added!" << COLOR_RESET << "\n\n";
 }
 
-void review_flashcards(std::vector<Flashcard> &cards) {
+void review_flashcards(std::vector<Flashcard>& cards) {
   if (cards.empty()) {
     std::cout << COLOR_YELLOW << "No flashcards to review. Add some first!\n\n"
               << COLOR_RESET;
@@ -82,7 +85,7 @@ void review_flashcards(std::vector<Flashcard> &cards) {
             << "1. Review ALL cards\n"
             << "2. Review by TAGS\n"
             << "3. Review DIFFICULT cards (incorrect > correct)\n"
-            << "q. go back\n"
+            << COLOR_YELLOW << "q. go back\n"
             << "Choose review mode: " << COLOR_RESET;
 
   std::string mode_input;
@@ -115,7 +118,7 @@ void review_flashcards(std::vector<Flashcard> &cards) {
 
   std::vector<std::reference_wrapper<Flashcard>> shuffled_refs;
 
-  for (auto &card : cards) {
+  for (auto& card : cards) {
     bool include_card = true;
 
     if (filter_by_difficulty) {
@@ -126,7 +129,7 @@ void review_flashcards(std::vector<Flashcard> &cards) {
 
     if (include_card && !filter_tags.empty()) {
       bool has_filter_tag = false;
-      for (const auto &filter_tag : filter_tags) {
+      for (const auto& filter_tag : filter_tags) {
         if (std::find(card.tags.begin(), card.tags.end(), filter_tag) !=
             card.tags.end()) {
           has_filter_tag = true;
@@ -157,7 +160,7 @@ void review_flashcards(std::vector<Flashcard> &cards) {
   int correct_total = 0, wrong_total = 0;
 
   for (auto ref : shuffled_refs) {
-    Flashcard &card = ref.get();
+    Flashcard& card = ref.get();
     std::cout << COLOR_CYAN << "Q: " << card.question
               << "\nYour answer: " << COLOR_RESET;
     std::string user_answer;
@@ -191,7 +194,7 @@ void review_flashcards(std::vector<Flashcard> &cards) {
             << COLOR_RESET;
 }
 
-void list_flashcards(const std::vector<Flashcard> &cards) {
+void list_flashcards(const std::vector<Flashcard>& cards) {
   if (cards.empty()) {
     std::cout << COLOR_YELLOW << "No flashcards to display.\n\n" << COLOR_RESET;
     return;
@@ -206,15 +209,14 @@ void list_flashcards(const std::vector<Flashcard> &cards) {
   std::cout << "\n";
 }
 
-void edit_flashcard(std::vector<Flashcard> &cards) {
+void edit_flashcard(std::vector<Flashcard>& cards) {
   list_flashcards(cards);
-  if (cards.empty())
-    return;
+  if (cards.empty()) return;
   std::cout << "Enter the number of the flashcard to edit: ";
   int index = get_int_input();
 
   if (index > 0 && index <= static_cast<int>(cards.size())) {
-    Flashcard &card = cards[index - 1];
+    Flashcard& card = cards[index - 1];
     std::string q, a, tags_str;
     std::cout << "Enter new question (current: " << card.question << "): ";
     std::getline(std::cin, q);
@@ -224,10 +226,8 @@ void edit_flashcard(std::vector<Flashcard> &cards) {
               << card.tags_to_string() << "): ";
     std::getline(std::cin, tags_str);
 
-    if (!q.empty())
-      card.question = q;
-    if (!a.empty())
-      card.answer = a;
+    if (!q.empty()) card.question = q;
+    if (!a.empty()) card.answer = a;
     if (!tags_str.empty()) {
       card.tags = split_string_by_delimiter(tags_str, ';');
     }
@@ -237,10 +237,9 @@ void edit_flashcard(std::vector<Flashcard> &cards) {
   }
 }
 
-void delete_flashcard(std::vector<Flashcard> &cards) {
+void delete_flashcard(std::vector<Flashcard>& cards) {
   list_flashcards(cards);
-  if (cards.empty())
-    return;
+  if (cards.empty()) return;
   std::cout << "Enter the number of the flashcard to delete: ";
   int index = get_int_input();
 
@@ -252,16 +251,16 @@ void delete_flashcard(std::vector<Flashcard> &cards) {
   }
 }
 
-void manage_flashcards(std::vector<Flashcard> &cards) {
+void manage_flashcards(std::vector<Flashcard>& cards) {
   while (true) {
-    std::cout << "1. List flashcards\n"
+    std::cout << COLOR_CYAN << "--- Managing Options ---\n"
+              << "1. List flashcards\n"
               << "2. Edit a flashcard\n"
               << "3. Delete a flashcard\n"
-              << "q. Return to main menu\n"
-              << COLOR_CYAN << "Choose: " << COLOR_RESET;
+              << COLOR_YELLOW << "q. Return to main menu\n"
+              << COLOR_RESET << COLOR_YELLOW << "Choose: " << COLOR_RESET;
     std::string choice;
-    std::cin >> choice;
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::getline(std::cin, choice);
     clear_screen();
 
     if (choice == "1") {
@@ -279,7 +278,7 @@ void manage_flashcards(std::vector<Flashcard> &cards) {
   }
 }
 
-void list_all_unique_tags(const std::vector<Flashcard> &cards) {
+void list_all_unique_tags(const std::vector<Flashcard>& cards) {
   if (cards.empty()) {
     std::cout << COLOR_YELLOW
               << "No flashcards added yet, so no tags to display.\n\n"
@@ -288,8 +287,8 @@ void list_all_unique_tags(const std::vector<Flashcard> &cards) {
   }
 
   std::set<std::string> unique_tags;
-  for (const auto &card : cards) {
-    for (const auto &tag : card.tags) {
+  for (const auto& card : cards) {
+    for (const auto& tag : card.tags) {
       unique_tags.insert(tag);
     }
   }
@@ -304,13 +303,13 @@ void list_all_unique_tags(const std::vector<Flashcard> &cards) {
             << ") ---\n"
             << COLOR_RESET;
   int i = 1;
-  for (const auto &tag : unique_tags) {
+  for (const auto& tag : unique_tags) {
     std::cout << i++ << ". " << tag << "\n";
   }
   std::cout << "\n";
 }
 
-void display_progress(const std::vector<Flashcard> &cards) {
+void display_progress(const std::vector<Flashcard>& cards) {
   if (cards.empty()) {
     std::cout << COLOR_YELLOW << "No flashcards to display progress for.\n\n"
               << COLOR_RESET;
@@ -319,7 +318,7 @@ void display_progress(const std::vector<Flashcard> &cards) {
 
   int term_width = get_terminal_width();
   int q_width =
-      std::max(10, term_width - 50); // Allocate remaining width to questions
+      std::max(10, term_width - 50);  // Allocate remaining width to questions
   const int num_width = 12;
 
   // Header
@@ -329,7 +328,7 @@ void display_progress(const std::vector<Flashcard> &cards) {
             << std::string(term_width, '-') << "\n";
 
   // Data
-  for (const auto &card : cards) {
+  for (const auto& card : cards) {
     int total = card.times_correct + card.times_incorrect;
     double success_rate =
         (total == 0)
@@ -375,8 +374,8 @@ int main() {
               << "4. Display progress\n"
               << "5. Import flashcards\n"
               << "6. Export flashcards\n"
-              << "7. Manage Tags\n"
-              << "0. Save and exit\n"
+              << "7. List unique Tags\n"
+              << COLOR_RESET COLOR_YELLOW << "0. Save and exit\n"
               << "h/? Help\n"
               << "Choose: " << COLOR_RESET;
     std::string input;
@@ -405,8 +404,7 @@ int main() {
       list_all_unique_tags(cards);
     } else if (input == "0") {
       save_flashcards(FILENAME, cards);
-      std::cout << COLOR_YELLOW << "Flashcards saved. Goodbye!\n"
-                << COLOR_RESET;
+      std::cout << COLOR_GREEN << "Flashcards saved. Goodbye!\n" << COLOR_RESET;
       break;
     } else if (input == "h" || input == "?") {
       print_help();

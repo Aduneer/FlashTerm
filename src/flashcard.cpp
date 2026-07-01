@@ -3,12 +3,13 @@
 namespace FlashTerm {
 Flashcard::Flashcard(const std::string& q, const std::string& a,
                      const std::vector<std::string>& t, int correct,
-                     int incorrect)
+                     int incorrect, int leitner)
     : question(q),
       answer(a),
       tags(t),
       times_correct(correct),
-      times_incorrect(incorrect) {}
+      times_incorrect(incorrect),
+      leitner_box(leitner) {}
 
 std::string Flashcard::tags_to_string() const {
   std::string result;

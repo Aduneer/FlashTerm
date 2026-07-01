@@ -26,5 +26,11 @@ void export_flashcards(const std::vector<Flashcard>& cards,
 std::vector<std::string> split_string_by_delimiter(const std::string& str,
                                                    char delimiter);
 
+std::string trim(const std::string& str);
+std::string to_lowercase(const std::string& str);
+int levenshtein_distance(const std::string& s1, const std::string& s2);
+std::string escape_csv_field(const std::string& field);
+std::vector<std::string> parse_csv_line(const std::string& line);
+
 int get_terminal_width();
 }  // namespace FlashTerm

@@ -1,0 +1,8 @@
+# Build output
+/FlashTerm
+/build/
+*.o
+*.d
+
+# Atomic-save leftovers from an interrupted write
+*.tmp

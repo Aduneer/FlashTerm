@@ -19,7 +19,8 @@ A feature-rich, interactive C++ command-line application for creating, managing,
   * A box-by-box breakdown of card mastery with visual ASCII progress bars.
   * Automatic flagging of your "Hardest Card to Remember."
 * 🛡️ **Robust CSV Parser**: Fully supports double-quotes so questions/answers can contain commas without corrupting the file database.
-* 🌀 **EOF and Pipe Safety**: Handles closed input streams gracefully. If you run the program non-interactively or pipe commands, it will auto-save your deck and exit cleanly rather than looping.
+* 💾 **Crash-Safe Autosave**: Your deck is written to disk after every answered card and every edit, so a crash or `Ctrl+C` mid-session never costs you your progress. Saves are atomic — the deck is written to a temporary file and renamed into place, so an interrupted or failed write can never leave you with a truncated deck. If the deck cannot be written, FlashTerm says so loudly instead of failing silently.
+* 🌀 **EOF and Pipe Safety**: Handles closed input streams gracefully. If you run the program non-interactively or pipe commands, it will auto-save your deck and exit cleanly rather than looping. Colour codes and screen clears are suppressed when output is not a terminal (and when `NO_COLOR` is set), so piped output stays readable.
 
 ---
 
@@ -38,7 +39,15 @@ Compile the application using the provided `Makefile`:
 make
 ```
 
-This creates an executable file named `FlashTerm`.
+This creates an executable file named `FlashTerm`. Object files land in `build/`.
+
+### Running the Tests
+
+```bash
+make test
+```
+
+Covers the text utilities (trimming, answer normalisation, Levenshtein distance, CSV escaping/parsing, UTF-8 column widths) and the `Deck` persistence layer (save/load round-trips, atomic writes, write failures, lossless import/export, tag collection, statistics).
 
 ### Running
 
@@ -69,9 +78,24 @@ When running FlashTerm, you can navigate using the main menu options:
 3. **Manage flashcards**: List all cards with their current Leitner box, edit questions/answers/tags, or delete cards.
 4. **Display progress**: View overall deck statistics, Leitner box distribution, hardest card, and card-by-card correctness rates.
 5. **Import flashcards**: Append flashcards from a `.csv` file.
-6. **Export flashcards**: Save the current deck to a clean `.csv` file.
+6. **Export flashcards**: Save the current deck to a `.csv` file. Exports carry review history, so an exported file can be re-imported without resetting your Leitner boxes and scores.
 7. **List unique Tags**: View all unique tags across your deck sorted alphabetically, along with card counts for each.
 8. **Save and exit**: Saves all changes and exits safely.
+
+---
+
+## Project Layout
+
+| File | Responsibility |
+| --- | --- |
+| `src/flashcard.*` | The `Flashcard` model |
+| `src/text.*` | String, CSV and UTF-8 column helpers (no I/O) |
+| `src/terminal.*` | Colour detection, screen clearing, terminal width |
+| `src/deck.*` | The `Deck` class: load, atomic save, import/export, tags, statistics |
+| `src/review.*` | Review session flow and the Leitner promotion rules |
+| `src/ui.*` | Menus, prompts and the statistics screen |
+| `src/main.cpp` | Argument handling and the main menu loop |
+| `tests/tests.cpp` | Test suite (`make test`) |
 
 ---
 

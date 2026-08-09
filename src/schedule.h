@@ -24,4 +24,16 @@ struct AnswerResult {
 // Applies the Leitner move and the resulting schedule: a correct answer
 // promotes one box, a wrong answer drops the card straight back to box 1.
 AnswerResult record_answer(Flashcard* card, bool correct, int today_days);
+
+// Everything record_answer touches, so an answer can be taken back exactly.
+struct CardState {
+  int times_correct = 0;
+  int times_incorrect = 0;
+  int leitner_box = 1;
+  int last_reviewed = kNoDate;
+  int due_date = kNoDate;
+};
+
+CardState capture_state(const Flashcard& card);
+void restore_state(Flashcard* card, const CardState& state);
 }  // namespace FlashTerm

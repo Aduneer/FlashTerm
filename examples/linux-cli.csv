@@ -1,0 +1,12 @@
+Which command prints the current working directory?,pwd,linux;navigation
+Which command changes a file's permissions?,chmod,linux;permissions
+Which command changes a file's owner?,chown,linux;permissions
+Which command searches file contents for a pattern?,grep,linux;text
+Which command searches for files by name in a directory tree?,find,linux;files
+Which command edits a stream of text line by line?,sed,linux;text
+Which command reports free space on mounted filesystems?,df,linux;disk
+Which command reports how much space files and directories use?,du,linux;disk
+Which command sends a signal to a process by its ID?,kill,linux;processes
+Which flags create a symbolic link rather than a hard one?,ln -s|-s,linux;files
+Which environment variable lists the directories searched for executables?,PATH|$PATH,linux;environment
+Which command shows the first lines of a file?,head,linux;text

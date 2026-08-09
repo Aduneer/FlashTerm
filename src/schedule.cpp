@@ -31,4 +31,22 @@ AnswerResult record_answer(Flashcard* card, bool correct, int today_days) {
   result.due_date = card->due_date;
   return result;
 }
+
+CardState capture_state(const Flashcard& card) {
+  CardState state;
+  state.times_correct = card.times_correct;
+  state.times_incorrect = card.times_incorrect;
+  state.leitner_box = card.leitner_box;
+  state.last_reviewed = card.last_reviewed;
+  state.due_date = card.due_date;
+  return state;
+}
+
+void restore_state(Flashcard* card, const CardState& state) {
+  card->times_correct = state.times_correct;
+  card->times_incorrect = state.times_incorrect;
+  card->leitner_box = state.leitner_box;
+  card->last_reviewed = state.last_reviewed;
+  card->due_date = state.due_date;
+}
 }  // namespace FlashTerm

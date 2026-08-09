@@ -7,6 +7,7 @@
 #include <random>
 #include <vector>
 
+#include "answer.h"
 #include "date.h"
 #include "schedule.h"
 #include "terminal.h"
@@ -217,12 +218,41 @@ void print_header(const Flashcard& card, size_t position, size_t total,
             << std::string(std::min(50, terminal_width()), '-') << "\n\n";
 }
 
-// A short answer tolerates one typo, a longer one tolerates two.
-bool is_near_miss(const std::string& typed, const std::string& expected) {
-  const int distance = levenshtein_distance(typed, expected);
-  if (expected.length() >= 4 && expected.length() <= 8) return distance <= 1;
-  if (expected.length() > 8) return distance <= 2;
-  return false;
+void print_correct_answer(const Flashcard& card) {
+  std::cout << color::red
+            << "\n❌ Incorrect! Correct answer: " << primary_answer(card.answer)
+            << color::reset;
+  const std::string others = alternatives_summary(card.answer);
+  if (!others.empty()) {
+    std::cout << color::yellow << "  (also accepted: " << others << ")"
+              << color::reset;
+  }
+  std::cout << "\n";
+}
+
+enum class Action { kContinue, kUndo };
+
+// Editing keeps the prompt open, so a card fixed on the spot can still have
+// its answer taken back in the same breath.
+Action prompt_next_action(Deck& deck, Flashcard& card) {
+  while (true) {
+    std::cout << "\n"
+              << color::yellow
+              << "[Enter] next  [e] edit this card  [u] undo this answer: "
+              << color::reset;
+    std::string input;
+    read_line(input);
+    const std::string action = to_lowercase(trim(input));
+
+    if (action == "u") return Action::kUndo;
+    if (action == "e") {
+      edit_card_fields(card);
+      autosave(deck);
+      std::cout << color::green << "Card updated.\n" << color::reset;
+      continue;
+    }
+    return Action::kContinue;
+  }
 }
 
 void print_schedule(const AnswerResult& result) {
@@ -312,25 +342,23 @@ void review_flashcards(Deck& deck) {
   int correct_total = 0;
   int wrong_total = 0;
 
-  for (size_t idx = 0; idx < matches.size(); ++idx) {
+  size_t idx = 0;
+  while (idx < matches.size()) {
     Flashcard& card = matches[idx].get();
     clear_screen();
     print_header(card, idx + 1, matches.size(), today_days);
 
     std::cout << color::cyan << "Q: " << card.question << color::reset << "\n\n";
-    std::string typed = prompt("Your answer: ");
+    const std::string typed = prompt("Your answer: ");
 
-    bool counted_correct =
-        normalize_answer(typed) == normalize_answer(card.answer);
+    const AnswerCheck check = check_answer(typed, card.answer);
+    bool counted_correct = check.exact;
     if (counted_correct) {
       std::cout << color::green << "\n✅ Correct!" << color::reset << "\n";
     } else {
-      const std::string clean_typed = to_lowercase(trim(typed));
-      const std::string clean_answer = to_lowercase(trim(card.answer));
-
-      if (is_near_miss(clean_typed, clean_answer)) {
+      if (check.near_miss) {
         std::cout << color::yellow
-                  << "\n⚠️  Close! The correct answer is: " << card.answer
+                  << "\n⚠️  Close! The correct answer is: " << check.closest
                   << "\n   (You typed: " << typed << ")\n"
                   << "Mark as correct anyway? [y/N]: " << color::reset;
         std::string override_input;
@@ -341,21 +369,23 @@ void review_flashcards(Deck& deck) {
           counted_correct = true;
         }
       }
-      if (!counted_correct) {
-        std::cout << color::red << "\n❌ Incorrect! Correct answer: "
-                  << card.answer << color::reset << "\n";
-      }
+      if (!counted_correct) print_correct_answer(card);
     }
 
+    const CardState before = capture_state(card);
     const AnswerResult result = record_answer(&card, counted_correct, today_days);
     (counted_correct ? correct_total : wrong_total)++;
     print_schedule(result);
 
     autosave(deck);
 
-    std::cout << "\nPress Enter to continue...";
-    std::string discard;
-    read_line(discard);
+    if (prompt_next_action(deck, card) == Action::kUndo) {
+      restore_state(&card, before);
+      (counted_correct ? correct_total : wrong_total)--;
+      autosave(deck);
+      continue;  // same card, asked again
+    }
+    ++idx;
   }
 
   clear_screen();

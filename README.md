@@ -18,20 +18,15 @@ A feature-rich, interactive C++ command-line application for creating, managing,
   | 5 (mastered) | 30 days |
 
   Cards you have never reviewed are due immediately. Existing decks upgrade automatically — every card simply starts out due, keeping its box and scores.
-* 🏷️ **Tag System & Interactive Filtering**: Tag cards (e.g., `cpp; memory`) to filter reviews. Supports tag sorting and an interactive selection menu where you can choose tags by number or name.
-* ✍️ **Typo Tolerance & Manual Override**: Uses Levenshtein Distance to check how close your typed answer is to the correct one. If you make a minor typo, FlashTerm will show a warning and let you override it (mark it as correct).
-* 🗃️ **Custom Decks via CLI**: Load, edit, and save distinct flashcard decks by passing the filename as a command-line argument:
-  ```bash
-  ./FlashTerm vocabulary.txt
-  ```
-  *(Defaults to `flashcards.txt` if no argument is provided).*
-* 📊 **Deck Statistics Dashboard**: View detailed metrics about your progress:
-  * Overall success rates and review counts.
-  * A box-by-box breakdown of card mastery with visual ASCII progress bars.
-  * Automatic flagging of your "Hardest Card to Remember."
-* 🛡️ **Robust CSV Parser**: Fully supports double-quotes so questions/answers can contain commas without corrupting the file database.
-* 💾 **Crash-Safe Autosave**: Your deck is written to disk after every answered card and every edit, so a crash or `Ctrl+C` mid-session never costs you your progress. Saves are atomic — the deck is written to a temporary file and renamed into place, so an interrupted or failed write can never leave you with a truncated deck. If the deck cannot be written, FlashTerm says so loudly instead of failing silently.
-* 🌀 **EOF and Pipe Safety**: Handles closed input streams gracefully. If you run the program non-interactively or pipe commands, it will auto-save your deck and exit cleanly rather than looping. Colour codes and screen clears are suppressed when output is not a terminal (and when `NO_COLOR` is set), so piped output stays readable.
+* 🏷️ **Tag System & Interactive Filtering**: Tag cards (e.g., `cpp; memory`) to filter reviews, picking tags by number or name.
+* ✍️ **Typo Tolerance**: Levenshtein distance catches near misses. A minor typo prompts you to override it rather than counting it wrong.
+* ✅ **Multiple Accepted Answers**: Separate alternatives with `|` — `std::unique_ptr|unique_ptr` — and any of them counts. The first is shown back to you when you miss the card, the rest as also accepted.
+* ↩️ **Undo & Fix In Place**: After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
+* 🗃️ **Custom Decks via CLI**: `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`.
+* 📊 **Deck Statistics Dashboard**: Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, and automatic flagging of your hardest card.
+* 🛡️ **Robust CSV Parser**: Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
+* 💾 **Crash-Safe Autosave**: The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
+* 🌀 **EOF and Pipe Safety**: Piped or non-interactive input auto-saves and exits cleanly rather than looping. Colour and screen clears are suppressed when output is not a terminal, or when `NO_COLOR` is set.
 
 ---
 
@@ -52,13 +47,43 @@ make
 
 This creates an executable file named `FlashTerm`. Object files land in `build/`.
 
+### Running
+
+```bash
+./FlashTerm                    # default deck, created on first run
+./FlashTerm path/to/deck.txt   # any other deck
+```
+
+Your decks are yours: `flashcards.txt` is deliberately not tracked by git, so
+studying never shows up as a source change.
+
+### Starter Decks
+
+A new deck starts empty. To fill it, choose **5. Import flashcards** and give it
+any file from `examples/` — programming languages, tooling and human languages:
+
+```bash
+ls examples/
+```
+
+Imported cards arrive in Box 1 and are due immediately. The examples are plain
+`question,answer,tags` records, the shortest form of the deck format below, so
+they double as a template for writing your own. Several use `|` to accept more
+than one answer, which is worth copying: `mañana` really does mean both
+*tomorrow* and *morning*, and `git init` should not be marked wrong because you
+typed `init`.
+
 ### Running the Tests
 
 ```bash
 make test
 ```
 
-Covers the text utilities (trimming, answer normalisation, Levenshtein distance, CSV escaping/parsing, UTF-8 column widths), the date and scheduling logic (calendar round-trips, leap years, box intervals, due calculations), and the `Deck` persistence layer (save/load round-trips, atomic writes, write failures, lossless import/export, legacy-deck migration, tag collection, statistics).
+Covers the text and answer-matching utilities (normalisation, Levenshtein
+distance, CSV escaping, UTF-8 column widths, alternatives, undo round-trips),
+the scheduling logic (calendar arithmetic, leap years, box intervals, due
+dates), and the `Deck` persistence layer (atomic writes, write failures,
+lossless import/export, legacy-deck migration, statistics).
 
 ### Deck File Format
 
@@ -68,41 +93,24 @@ One CSV record per card, with the last five fields optional:
 question,answer,tags,correct,incorrect,box,last_reviewed,due_date
 ```
 
-Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
-
-### Running
-
-To launch with the default deck (`flashcards.txt`):
-
-```bash
-./FlashTerm
-```
-
-To launch with a custom deck file:
-
-```bash
-./FlashTerm path/to/my_deck.txt
-```
+Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers may list alternatives separated by `|`. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
 
 ---
 
 ## Usage Guide
 
-When running FlashTerm, you can navigate using the main menu options:
+| Menu | What it does |
+| --- | --- |
+| 1. Add flashcard | Question, answer and semicolon-separated tags. Use `\|` for alternative answers. |
+| 2. Review flashcards | Pick a mode: **due** cards (most overdue first), **all** (shuffled), by **tag**, **difficult** only (incorrect > correct), or by **box**. |
+| 3. Manage flashcards | List, edit or delete cards. |
+| 4. Display progress | Deck statistics, due counts, box distribution, hardest card, per-card rates. |
+| 5. Import flashcards | Append cards from a `.csv` file. |
+| 6. Export flashcards | Write the deck to `.csv`, review history included, so it re-imports without losing progress. |
+| 7. List unique Tags | Every tag in the deck, sorted, with card counts. |
+| 0. Save and exit | Saves and exits. (The deck is already saved after every change.) |
 
-1. **Add flashcard**: Prompts for a question, answer, and semicolon-separated tags.
-2. **Review flashcards**: Start a review session. You can choose to review:
-   - *DUE cards* — everything scheduled for today or earlier, most overdue first
-   - *ALL cards* (shuffled)
-   - *By TAGS* (select tags interactively)
-   - *DIFFICULT cards* (where Incorrect count > Correct count)
-   - *By LEITNER BOX* (focus on weaker cards first)
-3. **Manage flashcards**: List all cards with their current Leitner box, edit questions/answers/tags, or delete cards.
-4. **Display progress**: View overall deck statistics, how many cards are due and when the next one arrives, Leitner box distribution, hardest card, and card-by-card correctness rates.
-5. **Import flashcards**: Append flashcards from a `.csv` file.
-6. **Export flashcards**: Save the current deck to a `.csv` file. Exports carry review history, so an exported file can be re-imported without resetting your Leitner boxes and scores.
-7. **List unique Tags**: View all unique tags across your deck sorted alphabetically, along with card counts for each.
-8. **Save and exit**: Saves all changes and exits safely.
+During a review, `u` undoes the last answer and `e` edits the current card.
 
 ---
 
@@ -111,6 +119,7 @@ When running FlashTerm, you can navigate using the main menu options:
 | File | Responsibility |
 | --- | --- |
 | `src/flashcard.*` | The `Flashcard` model |
+| `src/answer.*` | Accepted-answer alternatives and typo-tolerant matching |
 | `src/date.*` | Civil-calendar arithmetic and due-date formatting |
 | `src/schedule.*` | Box intervals, due checks, and the Leitner move for an answer |
 | `src/text.*` | String, CSV and UTF-8 column helpers (no I/O) |

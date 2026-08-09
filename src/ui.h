@@ -13,6 +13,10 @@ int read_int();
 // Persists the deck immediately, reporting any failure rather than losing it.
 void autosave(const Deck& deck);
 
+// Prompts for question, answer and tags, keeping the current value whenever
+// the reply is empty. Shared by the manage menu and mid-review editing.
+void edit_card_fields(Flashcard& card);
+
 void add_flashcard(Deck& deck);
 void manage_flashcards(Deck& deck);
 void list_flashcards(const Deck& deck);

@@ -1,0 +1,12 @@
+Which keyword defines an anonymous function?,lambda,python;basics;keywords
+Which method initialises a new instance of a class?,__init__,python;oop
+Which keyword turns a function into a generator?,yield,python;keywords;generators
+Which built-in returns the number of items in a container?,len,python;builtins
+Which built-in pairs up elements from several iterables?,zip,python;builtins
+Which ordered sequence type cannot be modified after creation?,tuple,python;basics;types
+Which statement guarantees a file is closed when the block ends?,with|with statement,python;basics;files
+Which exception is raised for a dictionary key that does not exist?,KeyError,python;exceptions
+Which decorator defines a method that needs no instance or class argument?,@staticmethod|staticmethod,python;oop;decorators
+Which standard module parses command-line arguments?,argparse,python;stdlib
+"Which operator assigns a value inside an expression, added in Python 3.8?",:=|walrus operator|walrus,python;operators
+Which PEP defines the Python style guide?,PEP 8|PEP8,python;style

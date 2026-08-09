@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "answer.h"
 #include "date.h"
 #include "deck.h"
 #include "schedule.h"
@@ -113,6 +114,123 @@ void test_utf8_columns() {
   } else {
     std::cout << "note: no UTF-8 locale, skipping wide-glyph width checks\n";
   }
+}
+
+void test_accepted_answers() {
+  const std::vector<std::string> single = accepted_answers("Paris");
+  EXPECT_EQ(single.size(), size_t{1});
+  EXPECT_EQ(single[0], std::string("Paris"));
+
+  const std::vector<std::string> many =
+      accepted_answers("std::unique_ptr | unique_ptr|smart pointer");
+  EXPECT_EQ(many.size(), size_t{3});
+  EXPECT_EQ(many[0], std::string("std::unique_ptr"));
+  EXPECT_EQ(many[1], std::string("unique_ptr"));
+  EXPECT_EQ(many[2], std::string("smart pointer"));
+
+  EXPECT_EQ(primary_answer("a|b|c"), std::string("a"));
+  EXPECT_EQ(alternatives_summary("a|b|c"), std::string("b, c"));
+  EXPECT_EQ(alternatives_summary("only"), std::string(""));
+
+  // Degenerate input must still yield something to compare against.
+  EXPECT_EQ(accepted_answers("").size(), size_t{1});
+  EXPECT_EQ(accepted_answers("||").size(), size_t{1});
+}
+
+void test_check_answer_exact() {
+  // Any listed alternative counts, and reports which one matched.
+  EXPECT_TRUE(check_answer("unique_ptr", "std::unique_ptr|unique_ptr").exact);
+  EXPECT_EQ(check_answer("unique_ptr", "std::unique_ptr|unique_ptr").closest,
+            std::string("unique_ptr"));
+  EXPECT_TRUE(check_answer("std::unique_ptr", "std::unique_ptr|unique_ptr").exact);
+
+  // Normalisation still applies to every alternative.
+  EXPECT_TRUE(check_answer("  ALBERT einstein ", "Albert Einstein|Einstein").exact);
+  EXPECT_TRUE(check_answer("smartpointer", "smart pointer|other").exact);
+
+  EXPECT_TRUE(!check_answer("Berlin", "Paris|Lyon").exact);
+  EXPECT_TRUE(!check_answer("", "Paris").exact);
+
+  // A single-answer card behaves exactly as before.
+  EXPECT_TRUE(check_answer("paris", "Paris").exact);
+}
+
+void test_check_answer_near_miss() {
+  // One typo in a mid-length answer is offered as an override.
+  const AnswerCheck typo = check_answer("Pariss", "Paris");
+  EXPECT_TRUE(!typo.exact);
+  EXPECT_TRUE(typo.near_miss);
+  EXPECT_EQ(typo.closest, std::string("Paris"));
+
+  // Two typos are too many at that length.
+  EXPECT_TRUE(!check_answer("Parsss", "Paris").near_miss);
+  // Longer answers get more slack.
+  EXPECT_TRUE(check_answer("Albert Einstien", "Albert Einstein").near_miss);
+  // Short answers must be exact, since one edit is a different answer.
+  EXPECT_TRUE(!check_answer("4", "3").near_miss);
+  EXPECT_TRUE(!check_answer("cat", "car").near_miss);
+
+  // The nearest alternative is the one reported back.
+  const AnswerCheck nearest = check_answer("Lyons", "Paris|Lyon|Marseille");
+  EXPECT_TRUE(nearest.near_miss);
+  EXPECT_EQ(nearest.closest, std::string("Lyon"));
+
+  // A wrong answer that is close to nothing stays a plain miss.
+  EXPECT_TRUE(!check_answer("Tokyo", "Paris|Lyon").near_miss);
+}
+
+void test_undo_restores_card_exactly() {
+  const int now = days_from_civil(2026, 8, 9);
+
+  Flashcard card("Q", "A", {}, 4, 1, 3);
+  card.last_reviewed = days_from_civil(2026, 8, 2);
+  card.due_date = days_from_civil(2026, 8, 9);
+
+  // A wrong answer, then undo, must leave no trace at all.
+  const CardState before = capture_state(card);
+  record_answer(&card, false, now);
+  EXPECT_EQ(card.leitner_box, 1);
+  EXPECT_EQ(card.times_incorrect, 2);
+
+  restore_state(&card, before);
+  EXPECT_EQ(card.times_correct, 4);
+  EXPECT_EQ(card.times_incorrect, 1);
+  EXPECT_EQ(card.leitner_box, 3);
+  EXPECT_EQ(card.last_reviewed, days_from_civil(2026, 8, 2));
+  EXPECT_EQ(card.due_date, days_from_civil(2026, 8, 9));
+
+  // The same holds for a correct answer on a never-reviewed card, where the
+  // dates have to go back to "never" rather than to some default.
+  Flashcard fresh("Q", "A");
+  const CardState fresh_before = capture_state(fresh);
+  record_answer(&fresh, true, now);
+  EXPECT_TRUE(fresh.due_date != kNoDate);
+
+  restore_state(&fresh, fresh_before);
+  EXPECT_EQ(fresh.times_correct, 0);
+  EXPECT_EQ(fresh.leitner_box, 1);
+  EXPECT_EQ(fresh.last_reviewed, kNoDate);
+  EXPECT_EQ(fresh.due_date, kNoDate);
+  EXPECT_TRUE(is_due(fresh, now));
+}
+
+void test_alternatives_survive_saving() {
+  const std::string path = temp_path("alternatives.txt");
+  std::remove(path.c_str());
+
+  Deck deck(path);
+  // Commas and pipes together, to be sure the CSV layer leaves them alone.
+  deck.add(Flashcard("Name a smart pointer, any one",
+                     "std::unique_ptr|unique_ptr|shared_ptr", {"cpp"}));
+  EXPECT_TRUE(deck.save());
+
+  Deck reloaded(path);
+  EXPECT_TRUE(reloaded.load());
+  EXPECT_EQ(reloaded.cards()[0].answer,
+            std::string("std::unique_ptr|unique_ptr|shared_ptr"));
+  EXPECT_TRUE(check_answer("shared_ptr", reloaded.cards()[0].answer).exact);
+
+  std::remove(path.c_str());
 }
 
 void test_civil_dates() {
@@ -515,6 +633,11 @@ int main() {
   test_levenshtein();
   test_csv_roundtrip();
   test_utf8_columns();
+  test_accepted_answers();
+  test_check_answer_exact();
+  test_check_answer_near_miss();
+  test_undo_restores_card_exactly();
+  test_alternatives_survive_saving();
   test_civil_dates();
   test_date_formatting();
   test_describe_due();

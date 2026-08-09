@@ -1,0 +1,12 @@
+Which command creates a new repository in the current directory?,git init|init,git;basics
+Which command shows the state of the working tree?,git status|status,git;basics
+Which command stages a file for the next commit?,git add|add,git;basics
+Which command temporarily shelves uncommitted changes?,git stash|stash,git;workflow
+Which command replays your commits on top of another branch?,git rebase|rebase,git;history
+Which command creates a new commit that undoes an earlier one?,git revert|revert,git;history
+Which command downloads objects from a remote without merging them?,git fetch|fetch,git;remotes
+Which file lists paths that git should not track?,.gitignore|gitignore,git;basics
+Which flag folds staged changes into the previous commit?,--amend|amend,git;history
+What is the name of the pointer to the currently checked-out commit?,HEAD,git;concepts
+Which command shows the commit that last modified each line of a file?,git blame|blame,git;history
+Which command lists and creates branches?,git branch|branch,git;branches

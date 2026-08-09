@@ -65,7 +65,8 @@ void add_flashcard(Deck& deck) {
     return;
   }
 
-  const std::string answer = prompt("Enter answer: ");
+  const std::string answer = prompt(
+      "Enter answer (separate alternatives with |, e.g. std::vector|vector): ");
   const std::string tags_str =
       prompt("Enter tags (semicolon-separated, e.g. math;science): ");
 
@@ -93,6 +94,21 @@ void list_flashcards(const Deck& deck) {
   std::cout << "\n";
 }
 
+void edit_card_fields(Flashcard& card) {
+  const std::string question =
+      prompt("Enter new question (current: " + card.question + "): ");
+  const std::string answer =
+      prompt("Enter new answer (current: " + card.answer +
+             ") [use | to accept alternatives]: ");
+  const std::string tags_str =
+      prompt("Enter new tags (semicolon;separated, current: " +
+             card.tags_to_string() + "): ");
+
+  if (!question.empty()) card.question = question;
+  if (!answer.empty()) card.answer = answer;
+  if (!tags_str.empty()) card.tags = split(tags_str, ';');
+}
+
 namespace {
 void edit_flashcard(Deck& deck) {
   list_flashcards(deck);
@@ -105,19 +121,7 @@ void edit_flashcard(Deck& deck) {
     return;
   }
 
-  Flashcard& card = deck.cards()[index - 1];
-  const std::string question =
-      prompt("Enter new question (current: " + card.question + "): ");
-  const std::string answer =
-      prompt("Enter new answer (current: " + card.answer + "): ");
-  const std::string tags_str =
-      prompt("Enter new tags (semicolon;separated, current: " +
-             card.tags_to_string() + "): ");
-
-  if (!question.empty()) card.question = question;
-  if (!answer.empty()) card.answer = answer;
-  if (!tags_str.empty()) card.tags = split(tags_str, ';');
-
+  edit_card_fields(deck.cards()[index - 1]);
   autosave(deck);
   std::cout << color::green << "Flashcard updated!\n\n" << color::reset;
 }

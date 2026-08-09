@@ -1,0 +1,12 @@
+What is the output of std::cout << sizeof(char)?,1,cpp;basics;types
+Which keyword is used to specify that a function does not throw exceptions?,noexcept,cpp;keywords;exceptions
+What is the C++11 keyword to declare a variable whose type is automatically deduced?,auto,cpp;basics;keywords
+What is a class constructor that can be called with a single argument called if not marked explicit?,converting constructor,cpp;oop;constructors
+What pointer type has sole ownership of a dynamically allocated resource in C++11?,std::unique_ptr|unique_ptr,cpp;pointers;memory
+What pointer type holds a non-owning reference to an object managed by std::shared_ptr?,std::weak_ptr|weak_ptr,cpp;pointers;memory
+Which C++ cast is used for basic upcasts and downcasts without runtime type checks?,static_cast,cpp;casts
+Which C++ cast is used to perform safe downcasts at runtime using RTTI?,dynamic_cast,cpp;casts;rtti
+Which keyword is used to define a constant expression that can be evaluated at compile time?,constexpr,cpp;keywords;compiletime
+What is the C++17 feature that allows unpacking a tuple or pair directly into variables?,structured binding|structured bindings,cpp;c++17
+"Which relationship is described as ""has-a"", in contrast to inheritance's ""is-a""?",composition,cpp;oop;design
+What does RAII stand for?,Resource Acquisition Is Initialization,cpp;basics;raii

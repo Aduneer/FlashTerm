@@ -8,6 +8,8 @@
 #include <set>
 #include <utility>
 
+#include "date.h"
+#include "schedule.h"
 #include "text.h"
 
 namespace FlashTerm {
@@ -32,7 +34,8 @@ std::string card_to_csv(const Flashcard& card) {
          "," + escape_csv_field(card.tags_to_string()) + "," +
          std::to_string(card.times_correct) + "," +
          std::to_string(card.times_incorrect) + "," +
-         std::to_string(card.leitner_box);
+         std::to_string(card.leitner_box) + "," +
+         format_date(card.last_reviewed) + "," + format_date(card.due_date);
 }
 
 bool card_from_csv(const std::string& line, Flashcard* out) {
@@ -41,11 +44,17 @@ bool card_from_csv(const std::string& line, Flashcard* out) {
 
   const std::string tags_str = (fields.size() >= 3) ? fields[2] : "";
   int leitner = parse_int_or(fields, 5, 1);
-  leitner = std::min(5, std::max(1, leitner));
+  leitner = std::min(kMaxBox, std::max(1, leitner));
 
   *out = Flashcard(fields[0], fields[1], split(tags_str, ';'),
                    std::max(0, parse_int_or(fields, 3, 0)),
                    std::max(0, parse_int_or(fields, 4, 0)), leitner);
+
+  // Absent or unreadable dates leave the card due immediately, which is how
+  // decks written before scheduling existed are migrated.
+  out->last_reviewed =
+      (fields.size() >= 7) ? parse_date(fields[6]) : kNoDate;
+  out->due_date = (fields.size() >= 8) ? parse_date(fields[7]) : kNoDate;
   return true;
 }
 
@@ -135,7 +144,15 @@ int Deck::count_with_tag(const std::string& tag) const {
   return count;
 }
 
-DeckStats Deck::stats() const {
+int Deck::due_count(int today_days) const {
+  int count = 0;
+  for (const auto& card : cards_) {
+    if (is_due(card, today_days)) ++count;
+  }
+  return count;
+}
+
+DeckStats Deck::stats(int today_days) const {
   DeckStats stats;
   stats.total_cards = static_cast<int>(cards_.size());
 
@@ -145,7 +162,13 @@ DeckStats Deck::stats() const {
   for (const auto& card : cards_) {
     stats.total_correct += card.times_correct;
     stats.total_incorrect += card.times_incorrect;
-    stats.box_counts[std::min(5, std::max(1, card.leitner_box))]++;
+    stats.box_counts[std::min(kMaxBox, std::max(1, card.leitner_box))]++;
+
+    if (is_due(card, today_days)) {
+      ++stats.due_count;
+    } else if (stats.next_due == kNoDate || card.due_date < stats.next_due) {
+      stats.next_due = card.due_date;
+    }
 
     const int reviews = card.times_correct + card.times_incorrect;
     if (reviews == 0) continue;

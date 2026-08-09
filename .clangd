@@ -1,2 +1,4 @@
+# Relative include paths are resolved against each file's own directory, so
+# both spellings are needed: sources in src/ and the suite in tests/.
 CompileFlags:
-  Add: [-std=c++17, -Isrc]
+  Add: [-std=c++17, -Isrc, -I../src]

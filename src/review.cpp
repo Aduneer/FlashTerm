@@ -7,18 +7,27 @@
 #include <random>
 #include <vector>
 
+#include "date.h"
+#include "schedule.h"
 #include "terminal.h"
 #include "text.h"
 #include "ui.h"
 
 namespace FlashTerm {
 namespace {
-constexpr int kMaxBox = 5;
-
 using CardRefs = std::vector<std::reference_wrapper<Flashcard>>;
+
+enum Mode {
+  kModeDue = 1,
+  kModeAll = 2,
+  kModeTags = 3,
+  kModeDifficult = 4,
+  kModeBox = 5,
+};
 
 struct Filters {
   std::vector<std::string> tags_lower;
+  bool due_only = false;
   bool difficult_only = false;
   int leitner_box = 0;  // 0 means every box
 };
@@ -75,12 +84,16 @@ std::vector<std::string> select_tags(const std::vector<std::string>& available) 
 }
 
 // Returns false when the user backs out of the review menu.
-bool choose_filters(const Deck& deck, Filters* filters, int* mode) {
+bool choose_filters(const Deck& deck, int today_days, Filters* filters,
+                    int* mode) {
+  const DeckStats stats = deck.stats(today_days);
+
   std::cout << color::cyan << "\n--- Review Options ---\n"
-            << "1. Review ALL cards\n"
-            << "2. Review by TAGS\n"
-            << "3. Review DIFFICULT cards (incorrect > correct)\n"
-            << "4. Review by LEITNER BOX (Focus on weaker boxes)\n"
+            << "1. Review cards DUE now (" << stats.due_count << " cards)\n"
+            << "2. Review ALL cards\n"
+            << "3. Review by TAGS\n"
+            << "4. Review DIFFICULT cards (incorrect > correct)\n"
+            << "5. Review by LEITNER BOX (Focus on weaker boxes)\n"
             << color::yellow << "q. go back\n"
             << "Choose review mode: " << color::reset;
 
@@ -97,7 +110,9 @@ bool choose_filters(const Deck& deck, Filters* filters, int* mode) {
     *mode = 0;
   }
 
-  if (*mode == 2) {
+  if (*mode == kModeDue) {
+    filters->due_only = true;
+  } else if (*mode == kModeTags) {
     const std::vector<std::string> available = deck.unique_tags();
     if (available.empty()) {
       std::cout << color::yellow
@@ -113,17 +128,17 @@ bool choose_filters(const Deck& deck, Filters* filters, int* mode) {
     for (const auto& tag : select_tags(available)) {
       filters->tags_lower.push_back(to_lowercase(tag));
     }
-  } else if (*mode == 3) {
+  } else if (*mode == kModeDifficult) {
     filters->difficult_only = true;
     std::cout << color::yellow
               << "Reviewing cards you find difficult (Incorrect > Correct).\n"
               << color::reset;
-  } else if (*mode == 4) {
-    const DeckStats stats = deck.stats();
+  } else if (*mode == kModeBox) {
     std::cout << color::cyan << "\n--- Select Leitner Box ---\n" << color::reset;
     for (int box = 1; box <= kMaxBox; ++box) {
-      std::cout << "  " << box << ". Box " << box << " (" << stats.box_counts[box]
-                << " cards)\n";
+      std::cout << "  " << box << ". Box " << box << " ("
+                << stats.box_counts[box] << " cards, reviewed every "
+                << interval_for_box(box) << " days)\n";
     }
     std::cout << "  0. Review ALL boxes (prioritizing lower boxes)\n"
               << color::yellow << "Choose Box: " << color::reset;
@@ -131,17 +146,20 @@ bool choose_filters(const Deck& deck, Filters* filters, int* mode) {
     if (filters->leitner_box < 0 || filters->leitner_box > kMaxBox) {
       filters->leitner_box = 0;
     }
-  } else if (*mode != 1) {
+  } else if (*mode != kModeAll) {
     std::cout << color::red << "Invalid review mode. Defaulting to ALL cards.\n"
               << color::reset;
-    *mode = 1;
+    *mode = kModeAll;
   }
   return true;
 }
 
-CardRefs collect_matches(Deck& deck, const Filters& filters) {
+CardRefs collect_matches(Deck& deck, const Filters& filters, int today_days) {
   CardRefs matches;
   for (auto& card : deck.cards()) {
+    if (filters.due_only && !is_due(card, today_days)) {
+      continue;
+    }
     if (filters.difficult_only && card.times_incorrect <= card.times_correct) {
       continue;
     }
@@ -170,7 +188,17 @@ void order_by_box(CardRefs* refs) {
   }
 }
 
-void print_header(const Flashcard& card, size_t position, size_t total) {
+// Most overdue first, so the longest-neglected cards are never the ones cut
+// short when a session is abandoned halfway.
+void order_by_due(CardRefs* refs) {
+  std::stable_sort(refs->begin(), refs->end(),
+                   [](const Flashcard& a, const Flashcard& b) {
+                     return a.due_date < b.due_date;
+                   });
+}
+
+void print_header(const Flashcard& card, size_t position, size_t total,
+                  int today_days) {
   const int bar_width = 20;
   const int filled = static_cast<int>((position * bar_width) / total);
 
@@ -180,7 +208,8 @@ void print_header(const Flashcard& card, size_t position, size_t total) {
   }
   std::cout << "] " << (position * 100) / total << "% (" << position << "/"
             << total << " cards)\n"
-            << "Box: " << card.leitner_box;
+            << "Box: " << card.leitner_box << " | Due: "
+            << describe_due(card.due_date, today_days);
   if (!card.tags.empty()) {
     std::cout << " | Tags: " << card.tags_to_string();
   }
@@ -196,25 +225,21 @@ bool is_near_miss(const std::string& typed, const std::string& expected) {
   return false;
 }
 
-void promote(Flashcard& card) {
-  const int old_box = card.leitner_box;
-  card.leitner_box = std::min(kMaxBox, card.leitner_box + 1);
-  if (card.leitner_box > old_box) {
-    std::cout << color::green << "Card promoted to Box " << card.leitner_box
+void print_schedule(const AnswerResult& result) {
+  if (result.new_box > result.old_box) {
+    std::cout << color::green << "Card promoted to Box " << result.new_box
               << "!\n"
               << color::reset;
-  }
-}
-
-void demote(Flashcard& card) {
-  const int old_box = card.leitner_box;
-  card.leitner_box = 1;
-  if (old_box > 1) {
+  } else if (result.new_box < result.old_box) {
     std::cout << color::red << "Card demoted back to Box 1!\n" << color::reset;
   }
+  std::cout << color::cyan << "Next review in " << result.interval_days
+            << (result.interval_days == 1 ? " day (" : " days (")
+            << format_date(result.due_date) << ").\n"
+            << color::reset;
 }
 
-void print_summary(int correct, int wrong) {
+void print_summary(int correct, int wrong, const Deck& deck, int today_days) {
   const int total = correct + wrong;
   const double percent =
       (total > 0) ? static_cast<double>(correct) * 100.0 / total : 0.0;
@@ -228,11 +253,23 @@ void print_summary(int correct, int wrong) {
             << "  Total Reviewed: " << total << "\n"
             << "  Success Rate:   " << std::fixed << std::setprecision(2)
             << percent << "%\n"
+            << "  Still Due:      " << deck.due_count(today_days) << "\n"
             << "==================================================\n\n"
             << "Press Enter to return to main menu..." << color::reset;
   std::string discard;
   read_line(discard);
   clear_screen();
+}
+
+void report_nothing_due(const Deck& deck, int today_days) {
+  const DeckStats stats = deck.stats(today_days);
+  std::cout << color::green << "Nothing is due right now — you are all caught up!\n"
+            << color::reset;
+  if (stats.next_due != kNoDate) {
+    std::cout << "The next card is due " << describe_due(stats.next_due, today_days)
+              << " (" << format_date(stats.next_due) << ").\n";
+  }
+  std::cout << "\n";
 }
 }  // namespace
 
@@ -243,24 +280,33 @@ void review_flashcards(Deck& deck) {
     return;
   }
 
+  // Fixed for the whole session, so a review running past midnight stays
+  // internally consistent.
+  const int today_days = today();
+
   Filters filters;
-  int mode = 1;
-  if (!choose_filters(deck, &filters, &mode)) {
+  int mode = kModeAll;
+  if (!choose_filters(deck, today_days, &filters, &mode)) {
     return;
   }
 
-  CardRefs matches = collect_matches(deck, filters);
+  CardRefs matches = collect_matches(deck, filters, today_days);
   if (matches.empty()) {
-    std::cout << color::yellow
-              << "No flashcards match the current review filters.\n\n"
-              << color::reset;
+    if (filters.due_only) {
+      report_nothing_due(deck, today_days);
+    } else {
+      std::cout << color::yellow
+                << "No flashcards match the current review filters.\n\n"
+                << color::reset;
+    }
     return;
   }
 
-  if (mode == 4 && filters.leitner_box == 0) {
+  std::shuffle(matches.begin(), matches.end(), rng());
+  if (mode == kModeBox && filters.leitner_box == 0) {
     order_by_box(&matches);
-  } else {
-    std::shuffle(matches.begin(), matches.end(), rng());
+  } else if (filters.due_only) {
+    order_by_due(&matches);
   }
 
   int correct_total = 0;
@@ -269,7 +315,7 @@ void review_flashcards(Deck& deck) {
   for (size_t idx = 0; idx < matches.size(); ++idx) {
     Flashcard& card = matches[idx].get();
     clear_screen();
-    print_header(card, idx + 1, matches.size());
+    print_header(card, idx + 1, matches.size(), today_days);
 
     std::cout << color::cyan << "Q: " << card.question << color::reset << "\n\n";
     std::string typed = prompt("Your answer: ");
@@ -301,15 +347,9 @@ void review_flashcards(Deck& deck) {
       }
     }
 
-    if (counted_correct) {
-      card.times_correct++;
-      correct_total++;
-      promote(card);
-    } else {
-      card.times_incorrect++;
-      wrong_total++;
-      demote(card);
-    }
+    const AnswerResult result = record_answer(&card, counted_correct, today_days);
+    (counted_correct ? correct_total : wrong_total)++;
+    print_schedule(result);
 
     autosave(deck);
 
@@ -319,6 +359,6 @@ void review_flashcards(Deck& deck) {
   }
 
   clear_screen();
-  print_summary(correct_total, wrong_total);
+  print_summary(correct_total, wrong_total, deck, today_days);
 }
 }  // namespace FlashTerm

@@ -5,6 +5,8 @@
 #include <iostream>
 #include <stdexcept>
 
+#include "date.h"
+#include "schedule.h"
 #include "terminal.h"
 #include "text.h"
 
@@ -78,13 +80,15 @@ void list_flashcards(const Deck& deck) {
               << color::reset;
     return;
   }
+  const int today_days = today();
   const auto& cards = deck.cards();
   for (size_t i = 0; i < cards.size(); ++i) {
     std::cout << i + 1 << ". " << cards[i].question << " - " << cards[i].answer;
     if (!cards[i].tags.empty()) {
       std::cout << " [Tags: " << cards[i].tags_to_string() << "]";
     }
-    std::cout << " (Box " << cards[i].leitner_box << ")\n";
+    std::cout << " (Box " << cards[i].leitner_box << ", due "
+              << describe_due(cards[i].due_date, today_days) << ")\n";
   }
   std::cout << "\n";
 }
@@ -193,7 +197,8 @@ void display_progress(const Deck& deck) {
     return;
   }
 
-  const DeckStats stats = deck.stats();
+  const int today_days = today();
+  const DeckStats stats = deck.stats(today_days);
   const int reviews = stats.total_correct + stats.total_incorrect;
 
   std::cout << color::cyan << "==================================================\n"
@@ -203,23 +208,31 @@ void display_progress(const Deck& deck) {
             << "\n  Overall Success Rate: " << std::fixed << std::setprecision(2)
             << stats.success_rate << "%\n  Total Reviews:        " << reviews
             << " (" << stats.total_correct << " Correct, "
-            << stats.total_incorrect << " Incorrect)\n\n";
+            << stats.total_incorrect << " Incorrect)\n  Due Now:              "
+            << stats.due_count << "\n";
+  if (stats.next_due != kNoDate) {
+    std::cout << "  Next Card Due:        "
+              << describe_due(stats.next_due, today_days) << " ("
+              << format_date(stats.next_due) << ")\n";
+  }
+  std::cout << "\n";
 
   std::cout << color::cyan << "--- Leitner Box Distribution ---\n"
             << color::reset;
-  for (int box = 1; box <= 5; ++box) {
+  for (int box = 1; box <= kMaxBox; ++box) {
     const int count = stats.box_counts[box];
     const int bar_width = 10;
     const int filled = (count * bar_width) / stats.total_cards;
 
     std::string label = "  Box " + std::to_string(box) + ": ";
     if (box == 1) label = "  Box 1 (Weakest): ";
-    if (box == 5) label = "  Box 5 (Mastered):";
+    if (box == kMaxBox) label = "  Box 5 (Mastered):";
 
     std::cout << std::left << std::setw(19) << label;
     draw_bar(filled, bar_width);
     std::cout << " " << count << " cards ("
-              << (count * 100 / stats.total_cards) << "%)\n";
+              << (count * 100 / stats.total_cards) << "%), every "
+              << interval_for_box(box) << "d\n";
   }
   std::cout << "\n";
 
@@ -233,9 +246,10 @@ void display_progress(const Deck& deck) {
   }
 
   const int width = terminal_width();
-  const size_t q_width = static_cast<size_t>(std::max(10, width - 40));
+  const size_t q_width = static_cast<size_t>(std::max(10, width - 48));
   const int num_width = 10;
-  const int box_width = 8;
+  const int box_width = 5;
+  const int due_width = 8;
 
   std::cout << color::cyan << std::string(width, '-') << "\n"
             << pad_right("", static_cast<size_t>(std::max(0, (width - 13) / 2)))
@@ -246,7 +260,8 @@ void display_progress(const Deck& deck) {
             << pad_right("Question", q_width) << std::right
             << std::setw(num_width) << "Correct" << std::setw(num_width)
             << "Incorrect" << std::setw(num_width) << "Success"
-            << std::setw(box_width) << "Box" << "\n"
+            << std::setw(box_width) << "Box" << std::setw(due_width) << "Due"
+            << "\n"
             << std::string(width, '-') << "\n";
 
   for (const auto& card : deck.cards()) {
@@ -259,7 +274,9 @@ void display_progress(const Deck& deck) {
               << std::right << std::setw(num_width) << card.times_correct
               << std::setw(num_width) << card.times_incorrect << std::fixed
               << std::setprecision(2) << std::setw(num_width) << rate
-              << std::setw(box_width) << card.leitner_box << "\n";
+              << std::setw(box_width) << card.leitner_box
+              << std::setw(due_width)
+              << describe_due_short(card.due_date, today_days) << "\n";
   }
 
   std::cout << "\nPress Enter to return to main menu...";
@@ -273,7 +290,7 @@ void print_help() {
       << color::yellow
       << "Commands:\n"
          "1 - Add flashcard\n"
-         "2 - Review flashcards (Choose All, by Tags, by Difficulty, or by "
+         "2 - Review flashcards (Due now, All, by Tags, by Difficulty, or by "
          "Leitner Box)\n"
          "3 - Manage flashcards (list/edit/delete)\n"
          "4 - Display progress & statistics\n"

@@ -6,7 +6,9 @@
 #include <string>
 #include <vector>
 
+#include "date.h"
 #include "deck.h"
+#include "schedule.h"
 #include "text.h"
 
 using namespace FlashTerm;
@@ -113,8 +115,146 @@ void test_utf8_columns() {
   }
 }
 
+void test_civil_dates() {
+  EXPECT_EQ(days_from_civil(1970, 1, 1), 0);
+  EXPECT_EQ(days_from_civil(1970, 1, 2), 1);
+  EXPECT_EQ(days_from_civil(1969, 12, 31), -1);
+  EXPECT_EQ(days_from_civil(2026, 8, 9), 20674);
+
+  // Leap-year handling must be exact or intervals drift.
+  EXPECT_EQ(days_from_civil(2024, 3, 1) - days_from_civil(2024, 2, 28), 2);
+  EXPECT_EQ(days_from_civil(2023, 3, 1) - days_from_civil(2023, 2, 28), 1);
+  EXPECT_EQ(days_from_civil(2000, 3, 1) - days_from_civil(2000, 2, 28), 2);
+  EXPECT_EQ(days_from_civil(1900, 3, 1) - days_from_civil(1900, 2, 28), 1);
+
+  // Round-trip a long span of days through both directions.
+  bool round_trips = true;
+  for (int day = -40000; day <= 40000; day += 7) {
+    int year = 0;
+    unsigned month = 0;
+    unsigned dom = 0;
+    civil_from_days(day, &year, &month, &dom);
+    if (days_from_civil(year, month, dom) != day) {
+      round_trips = false;
+      break;
+    }
+  }
+  EXPECT_TRUE(round_trips);
+}
+
+void test_date_formatting() {
+  EXPECT_EQ(format_date(0), std::string("1970-01-01"));
+  EXPECT_EQ(format_date(days_from_civil(2026, 8, 9)), std::string("2026-08-09"));
+  EXPECT_EQ(format_date(kNoDate), std::string(""));
+
+  EXPECT_EQ(parse_date("2026-08-09"), days_from_civil(2026, 8, 9));
+  EXPECT_EQ(parse_date(""), kNoDate);
+  EXPECT_EQ(parse_date("not-a-date"), kNoDate);
+  EXPECT_EQ(parse_date("2026-8-9"), kNoDate);      // must be zero padded
+  EXPECT_EQ(parse_date("2026-13-01"), kNoDate);    // no thirteenth month
+  EXPECT_EQ(parse_date("2026-02-30"), kNoDate);    // date does not exist
+  EXPECT_EQ(parse_date("2024-02-29"), days_from_civil(2024, 2, 29));
+}
+
+void test_describe_due() {
+  const int now = days_from_civil(2026, 8, 9);
+  EXPECT_EQ(describe_due(kNoDate, now), std::string("new"));
+  EXPECT_EQ(describe_due(now, now), std::string("today"));
+  EXPECT_EQ(describe_due(now + 1, now), std::string("tomorrow"));
+  EXPECT_EQ(describe_due(now + 5, now), std::string("in 5 days"));
+  EXPECT_EQ(describe_due(now - 1, now), std::string("overdue by 1 day"));
+  EXPECT_EQ(describe_due(now - 3, now), std::string("overdue by 3 days"));
+
+  EXPECT_EQ(describe_due_short(kNoDate, now), std::string("new"));
+  EXPECT_EQ(describe_due_short(now, now), std::string("due"));
+  EXPECT_EQ(describe_due_short(now - 9, now), std::string("due"));
+  EXPECT_EQ(describe_due_short(now + 5, now), std::string("5d"));
+}
+
+void test_is_due() {
+  const int now = days_from_civil(2026, 8, 9);
+  Flashcard card("Q", "A");
+
+  // A card that has never been scheduled is due immediately.
+  EXPECT_TRUE(is_due(card, now));
+
+  card.due_date = now;
+  EXPECT_TRUE(is_due(card, now));
+  card.due_date = now - 1;
+  EXPECT_TRUE(is_due(card, now));
+  card.due_date = now + 1;
+  EXPECT_TRUE(!is_due(card, now));
+}
+
+void test_record_answer_schedules() {
+  const int now = days_from_civil(2026, 8, 9);
+
+  // Correct answers walk the card up the boxes with widening intervals.
+  Flashcard card("Q", "A");
+  int expected_boxes[] = {2, 3, 4, 5, 5};
+  bool schedule_matches = true;
+  for (int step = 0; step < 5; ++step) {
+    const AnswerResult result = record_answer(&card, true, now + step);
+    if (card.leitner_box != expected_boxes[step]) schedule_matches = false;
+    if (result.interval_days != interval_for_box(expected_boxes[step])) {
+      schedule_matches = false;
+    }
+    if (card.due_date != now + step + result.interval_days) {
+      schedule_matches = false;
+    }
+    if (card.last_reviewed != now + step) schedule_matches = false;
+  }
+  EXPECT_TRUE(schedule_matches);
+  EXPECT_EQ(card.leitner_box, 5);
+  EXPECT_EQ(card.times_correct, 5);
+
+  // Box 5 stays at the longest interval rather than running off the array.
+  EXPECT_EQ(interval_for_box(5), 30);
+  EXPECT_EQ(interval_for_box(99), 30);
+  EXPECT_EQ(interval_for_box(0), 1);
+
+  // One wrong answer drops the card to box 1 and back to a one-day interval.
+  const AnswerResult missed = record_answer(&card, false, now + 10);
+  EXPECT_EQ(missed.old_box, 5);
+  EXPECT_EQ(missed.new_box, 1);
+  EXPECT_EQ(card.leitner_box, 1);
+  EXPECT_EQ(card.times_incorrect, 1);
+  EXPECT_EQ(card.due_date, now + 11);
+  EXPECT_EQ(missed.interval_days, 1);
+}
+
+void test_due_counts_and_next_due() {
+  const int now = days_from_civil(2026, 8, 9);
+  Deck deck(temp_path("due.txt"));
+
+  Flashcard fresh("New", "A");  // never reviewed, so due
+  Flashcard overdue("Late", "B");
+  overdue.due_date = now - 4;
+  Flashcard soon("Soon", "C");
+  soon.due_date = now + 2;
+  Flashcard later("Later", "D");
+  later.due_date = now + 9;
+
+  deck.add(fresh);
+  deck.add(overdue);
+  deck.add(soon);
+  deck.add(later);
+
+  EXPECT_EQ(deck.due_count(now), 2);
+
+  const DeckStats stats = deck.stats(now);
+  EXPECT_EQ(stats.due_count, 2);
+  EXPECT_EQ(stats.next_due, now + 2);
+
+  // Far enough in the future and everything has come due.
+  EXPECT_EQ(deck.due_count(now + 30), 4);
+  EXPECT_EQ(deck.stats(now + 30).next_due, kNoDate);
+}
+
 void test_card_csv() {
   Flashcard card("What is 2+2?", "4", {"math", "basics"}, 3, 1, 4);
+  card.last_reviewed = days_from_civil(2026, 8, 1);
+  card.due_date = days_from_civil(2026, 8, 15);
   const std::string line = card_to_csv(card);
 
   Flashcard parsed("", "");
@@ -125,11 +265,32 @@ void test_card_csv() {
   EXPECT_EQ(parsed.times_correct, 3);
   EXPECT_EQ(parsed.times_incorrect, 1);
   EXPECT_EQ(parsed.leitner_box, 4);
+  EXPECT_EQ(parsed.last_reviewed, card.last_reviewed);
+  EXPECT_EQ(parsed.due_date, card.due_date);
+  // Dates are stored readably rather than as opaque numbers.
+  EXPECT_TRUE(line.find("2026-08-01,2026-08-15") != std::string::npos);
 
   // A bare question/answer pair is still a valid card.
   Flashcard minimal("", "");
   EXPECT_TRUE(card_from_csv("Q,A", &minimal));
   EXPECT_EQ(minimal.leitner_box, 1);
+  EXPECT_EQ(minimal.due_date, kNoDate);
+
+  // Six-field decks written before scheduling existed load as due now,
+  // keeping their boxes and scores.
+  Flashcard legacy("", "");
+  EXPECT_TRUE(card_from_csv("Q,A,tag,4,2,3", &legacy));
+  EXPECT_EQ(legacy.leitner_box, 3);
+  EXPECT_EQ(legacy.times_correct, 4);
+  EXPECT_EQ(legacy.last_reviewed, kNoDate);
+  EXPECT_EQ(legacy.due_date, kNoDate);
+  EXPECT_TRUE(is_due(legacy, today()));
+
+  // A corrupt date is treated as unscheduled rather than trusted.
+  Flashcard bad_date("", "");
+  EXPECT_TRUE(card_from_csv("Q,A,,0,0,1,garbage,2026-99-99", &bad_date));
+  EXPECT_EQ(bad_date.last_reviewed, kNoDate);
+  EXPECT_EQ(bad_date.due_date, kNoDate);
 
   // Out-of-range and malformed boxes are clamped rather than trusted.
   Flashcard clamped("", "");
@@ -149,7 +310,9 @@ void test_save_load_roundtrip() {
   std::remove(path.c_str());
 
   Deck deck(path);
-  deck.add(Flashcard("Contains, a comma", "and \"quotes\"", {"csv"}, 2, 5, 3));
+  Flashcard scheduled("Contains, a comma", "and \"quotes\"", {"csv"}, 2, 5, 3);
+  scheduled.due_date = days_from_civil(2026, 12, 25);
+  deck.add(scheduled);
   deck.add(Flashcard("Plain", "Answer", {}, 0, 0, 1));
   EXPECT_TRUE(deck.save());
 
@@ -160,6 +323,36 @@ void test_save_load_roundtrip() {
   EXPECT_EQ(reloaded.cards()[0].answer, std::string("and \"quotes\""));
   EXPECT_EQ(reloaded.cards()[0].times_incorrect, 5);
   EXPECT_EQ(reloaded.cards()[0].leitner_box, 3);
+  EXPECT_EQ(reloaded.cards()[0].due_date, days_from_civil(2026, 12, 25));
+  EXPECT_EQ(reloaded.cards()[1].due_date, kNoDate);
+
+  std::remove(path.c_str());
+}
+
+void test_legacy_deck_migrates() {
+  const std::string path = temp_path("legacy.txt");
+  {
+    // Exactly the format written before scheduling was added.
+    std::ofstream file(path);
+    file << "What does RAII stand for?,Resource Acquisition Is "
+            "Initialization,cpp;basics,3,1,4\n"
+         << "Plain question,Answer,,0,0,1\n";
+  }
+
+  Deck deck(path);
+  EXPECT_TRUE(deck.load());
+  EXPECT_EQ(deck.size(), size_t{2});
+  // Boxes and scores survive; every card simply comes back due.
+  EXPECT_EQ(deck.cards()[0].leitner_box, 4);
+  EXPECT_EQ(deck.cards()[0].times_correct, 3);
+  EXPECT_EQ(deck.due_count(today()), 2);
+
+  // Saving upgrades the file in place, and the upgrade round-trips.
+  EXPECT_TRUE(deck.save());
+  Deck reloaded(path);
+  EXPECT_TRUE(reloaded.load());
+  EXPECT_EQ(reloaded.size(), size_t{2});
+  EXPECT_EQ(reloaded.cards()[0].leitner_box, 4);
 
   std::remove(path.c_str());
 }
@@ -212,12 +405,14 @@ void test_export_is_lossless() {
   std::remove(exported.c_str());
 
   Deck deck(source);
-  deck.add(Flashcard("Q1", "A1", {"tag"}, 9, 2, 5));
+  Flashcard card("Q1", "A1", {"tag"}, 9, 2, 5);
+  card.due_date = days_from_civil(2027, 1, 31);
+  deck.add(card);
 
   std::string error;
   EXPECT_TRUE(export_deck(deck, exported, &error));
 
-  // Re-importing an export must not reset review history.
+  // Re-importing an export must not reset review history or the schedule.
   Deck fresh(temp_path("export-target.txt"));
   const ImportResult result = import_into(fresh, exported);
   EXPECT_TRUE(result.ok);
@@ -225,6 +420,7 @@ void test_export_is_lossless() {
   EXPECT_EQ(fresh.cards()[0].times_correct, 9);
   EXPECT_EQ(fresh.cards()[0].times_incorrect, 2);
   EXPECT_EQ(fresh.cards()[0].leitner_box, 5);
+  EXPECT_EQ(fresh.cards()[0].due_date, days_from_civil(2027, 1, 31));
 
   std::remove(source.c_str());
   std::remove(exported.c_str());
@@ -282,7 +478,7 @@ void test_stats() {
   deck.add(Flashcard("Hard", "B", {}, 1, 9, 1));
   deck.add(Flashcard("Unseen", "C", {}, 0, 0, 1));
 
-  const DeckStats stats = deck.stats();
+  const DeckStats stats = deck.stats(today());
   EXPECT_EQ(stats.total_cards, 3);
   EXPECT_EQ(stats.total_correct, 11);
   EXPECT_EQ(stats.total_incorrect, 9);
@@ -294,8 +490,8 @@ void test_stats() {
   // A deck with no reviews yet has no "hardest" card to report.
   Deck fresh(temp_path("stats-empty.txt"));
   fresh.add(Flashcard("Q", "A"));
-  EXPECT_TRUE(fresh.stats().hardest_card == nullptr);
-  EXPECT_EQ(fresh.stats().success_rate, 0.0);
+  EXPECT_TRUE(fresh.stats(today()).hardest_card == nullptr);
+  EXPECT_EQ(fresh.stats(today()).success_rate, 0.0);
 }
 
 void test_remove() {
@@ -319,8 +515,15 @@ int main() {
   test_levenshtein();
   test_csv_roundtrip();
   test_utf8_columns();
+  test_civil_dates();
+  test_date_formatting();
+  test_describe_due();
+  test_is_due();
+  test_record_answer_schedules();
+  test_due_counts_and_next_due();
   test_card_csv();
   test_save_load_roundtrip();
+  test_legacy_deck_migrates();
   test_load_missing_file();
   test_save_failure_preserves_deck();
   test_save_is_atomic();

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 
+#include "date.h"
 #include "deck.h"
 #include "review.h"
 #include "terminal.h"
@@ -13,9 +14,14 @@ using namespace FlashTerm;
 namespace {
 const char kDefaultDeck[] = "flashcards.txt";
 
-void print_main_menu() {
+void print_main_menu(const Deck& deck) {
+  const int due = deck.due_count(today());
   std::cout << color::cyan << "1. Add flashcard\n"
-            << "2. Review flashcards\n"
+            << "2. Review flashcards";
+  if (due > 0) {
+    std::cout << color::yellow << "  (" << due << " due)" << color::cyan;
+  }
+  std::cout << "\n"
             << "3. Manage flashcards\n"
             << "4. Display progress\n"
             << "5. Import flashcards\n"
@@ -68,7 +74,7 @@ int main(int argc, char* argv[]) {
 
   try {
     while (true) {
-      print_main_menu();
+      print_main_menu(deck);
       std::string input;
       read_line(input);
       clear_screen();

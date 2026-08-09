@@ -6,10 +6,12 @@
 
 namespace FlashTerm {
 
-// One card serialised as a CSV record: question,answer,tags,correct,incorrect,box
+// One card as a CSV record:
+//   question,answer,tags,correct,incorrect,box,last_reviewed,due_date
 std::string card_to_csv(const Flashcard& card);
 // Returns false for records too short to be a card. Missing trailing fields
-// fall back to their defaults, so a bare "question,answer" line still loads.
+// fall back to their defaults, so a bare "question,answer" line still loads
+// and a pre-scheduling six-field deck simply comes back due immediately.
 bool card_from_csv(const std::string& line, Flashcard* out);
 
 struct DeckStats {
@@ -21,6 +23,9 @@ struct DeckStats {
   // Lowest success rate among cards that have actually been reviewed.
   const Flashcard* hardest_card = nullptr;
   double hardest_rate = 0.0;
+  int due_count = 0;
+  // Soonest due date among cards that are not due yet; kNoDate if none.
+  int next_due = kNoDate;
 };
 
 struct ImportResult {
@@ -54,7 +59,9 @@ class Deck {
   std::vector<std::string> unique_tags() const;
   int count_with_tag(const std::string& tag) const;
 
-  DeckStats stats() const;
+  int due_count(int today_days) const;
+
+  DeckStats stats(int today_days) const;
 
  private:
   std::string path_;

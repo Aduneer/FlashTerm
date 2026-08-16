@@ -16,7 +16,9 @@ Output demo/demo.gif
 Set Shell "bash"
 Set FontSize 18
 Set Width 1100
-Set Height 720
+# 800px fits the statistics dashboard, which is the tallest screen at 29 lines.
+# Anything shorter clips its title off the top.
+Set Height 800
 Set Padding 20
 Set Theme "Dracula"
 Set TypingSpeed 75ms
@@ -35,7 +37,7 @@ Sleep 600ms
 Enter
 
 # The main menu reports how many cards are actually due.
-Sleep 2.5s
+Sleep 2s
 Type "2"
 Enter
 Sleep 2s
@@ -51,27 +53,27 @@ Sleep 2.5s
 
 # A typo is offered as an override instead of being marked wrong outright.
 Type "libary"
-Sleep 800ms
+Sleep 700ms
 Enter
-Sleep 3s
+Sleep 2.5s
 Type "y"
 Enter
-Sleep 3s
+Sleep 2.5s
 Enter
-Sleep 1.5s
+Sleep 1.2s
 
 # A clean answer, and the card is promoted a box.
 Type "tree"
 Sleep 400ms
 Enter
-Sleep 3s
+Sleep 2.5s
 Enter
 
 # Session summary. "Still Due: 0" while the deck holds three cards, because the
 # third is not due yet.
-Sleep 3.5s
+Sleep 3s
 Enter
-Sleep 1.5s
+Sleep 1.2s
 
 # The statistics dashboard.
 Type "4"
@@ -97,4 +99,4 @@ Sleep 3s
 Type "la ciudad"
 Sleep 500ms
 Enter
-Sleep 3.5s
+Sleep 3s

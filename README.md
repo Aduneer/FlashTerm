@@ -4,6 +4,8 @@
 
 FlashTerm is a terminal flashcard app that makes you type the answer. No multiple choice and no self-grading: you either produce it or you don't, which is the whole point of active recall. Cards move through five Leitner boxes, each with a real review interval, so a card you know stops appearing until it is due again.
 
+![FlashTerm review session: a due card is answered with a typo, which is offered as an override rather than marked wrong; the card is promoted a Leitner box; then the statistics dashboard and a reversed review](demo/demo.gif)
+
 ---
 
 ## Key Features

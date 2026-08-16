@@ -60,6 +60,15 @@ void test_normalize_answer() {
   EXPECT_EQ(normalize_answer(""), std::string(""));
 }
 
+void test_count_label() {
+  EXPECT_EQ(count_label(1, "card", "cards"), std::string("1 card"));
+  EXPECT_EQ(count_label(0, "card", "cards"), std::string("0 cards"));
+  EXPECT_EQ(count_label(2, "card", "cards"), std::string("2 cards"));
+  EXPECT_EQ(count_label(142, "day", "days"), std::string("142 days"));
+  // Only exactly one is singular; a negative count is not a special case.
+  EXPECT_EQ(count_label(-1, "card", "cards"), std::string("-1 cards"));
+}
+
 void test_split() {
   const std::vector<std::string> tags = split("cpp; memory ;pointers", ';');
   EXPECT_EQ(tags.size(), size_t{3});
@@ -750,6 +759,7 @@ int main() {
   std::setlocale(LC_ALL, "");
   test_trim_and_case();
   test_normalize_answer();
+  test_count_label();
   test_split();
   test_levenshtein();
   test_csv_roundtrip();

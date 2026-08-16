@@ -63,6 +63,11 @@ std::string normalize_answer(const std::string& str) {
   return temp;
 }
 
+std::string count_label(int count, const std::string& singular,
+                        const std::string& plural) {
+  return std::to_string(count) + " " + (count == 1 ? singular : plural);
+}
+
 std::vector<std::string> split(const std::string& str, char delimiter) {
   std::vector<std::string> parts;
   if (str.empty()) {

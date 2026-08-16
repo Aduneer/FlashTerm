@@ -146,8 +146,9 @@ std::vector<std::size_t> list_matching(const Deck& deck) {
     print_card_row(deck.cards()[i], i + 1, today_days);
   }
   if (!query.empty()) {
-    std::cout << color::cyan << matches.size() << " of " << deck.size()
-              << " cards match. Numbers are deck positions.\n"
+    std::cout << color::cyan << "Showing " << matches.size() << " of "
+              << count_label(static_cast<int>(deck.size()), "card", "cards")
+              << ". Numbers are deck positions.\n"
               << color::reset;
   }
   std::cout << "\n";
@@ -251,8 +252,9 @@ void list_unique_tags(const Deck& deck) {
   std::cout << color::cyan << "--- All Unique Tags (" << tags.size() << ") ---\n"
             << color::reset;
   for (size_t i = 0; i < tags.size(); ++i) {
-    std::cout << i + 1 << ". " << tags[i] << " (" << deck.count_with_tag(tags[i])
-              << " cards)\n";
+    std::cout << i + 1 << ". " << tags[i] << " ("
+              << count_label(deck.count_with_tag(tags[i]), "card", "cards")
+              << ")\n";
   }
   std::cout << "\n";
 }
@@ -297,7 +299,7 @@ void display_progress(const Deck& deck) {
 
     std::cout << std::left << std::setw(19) << label;
     draw_bar(filled, bar_width);
-    std::cout << " " << count << " cards ("
+    std::cout << " " << count_label(count, "card", "cards") << " ("
               << (count * 100 / stats.total_cards) << "%), every "
               << interval_for_box(box) << "d\n";
   }

@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 #include "date.h"
 #include "schedule.h"
@@ -18,6 +19,17 @@ void draw_bar(int filled, int width) {
     std::cout << (i < filled ? "█" : "░");
   }
   std::cout << "]";
+}
+
+// `number` is the card's position in the deck, not its position in whatever
+// list is being shown, so the number stays the same after a search narrows it.
+void print_card_row(const Flashcard& card, std::size_t number, int today_days) {
+  std::cout << number << ". " << card.question << " - " << card.answer;
+  if (!card.tags.empty()) {
+    std::cout << " [Tags: " << card.tags_to_string() << "]";
+  }
+  std::cout << " (Box " << card.leitner_box << ", due "
+            << describe_due(card.due_date, today_days) << ")\n";
 }
 
 void edit_flashcard(Deck& deck);
@@ -84,12 +96,7 @@ void list_flashcards(const Deck& deck) {
   const int today_days = today();
   const auto& cards = deck.cards();
   for (size_t i = 0; i < cards.size(); ++i) {
-    std::cout << i + 1 << ". " << cards[i].question << " - " << cards[i].answer;
-    if (!cards[i].tags.empty()) {
-      std::cout << " [Tags: " << cards[i].tags_to_string() << "]";
-    }
-    std::cout << " (Box " << cards[i].leitner_box << ", due "
-              << describe_due(cards[i].due_date, today_days) << ")\n";
+    print_card_row(cards[i], i + 1, today_days);
   }
   std::cout << "\n";
 }
@@ -110,37 +117,90 @@ void edit_card_fields(Flashcard& card) {
 }
 
 namespace {
-void edit_flashcard(Deck& deck) {
-  list_flashcards(deck);
-  if (deck.empty()) return;
-  std::cout << "Enter the number of the flashcard to edit: ";
-  const int index = read_int();
-
-  if (index <= 0 || index > static_cast<int>(deck.size())) {
-    std::cout << color::red << "Invalid index.\n\n" << color::reset;
-    return;
+// Asks for a search term and lists what it matched, returning the deck
+// positions shown. Empty means there is nothing to pick from and the caller
+// should give up: either the deck is empty or nothing matched.
+std::vector<std::size_t> list_matching(const Deck& deck) {
+  if (deck.empty()) {
+    std::cout << color::yellow << "No flashcards to display.\n\n"
+              << color::reset;
+    return {};
   }
 
-  edit_card_fields(deck.cards()[index - 1]);
+  const std::string query = trim(prompt(
+      std::string(color::yellow) +
+      "Search question, answer or tags (Enter to list all): " + color::reset));
+  const std::vector<std::size_t> matches = deck.find(query);
+  // The prompt above leaves the cursor mid-line, which only the terminal's echo
+  // of your Enter hides. Piped input has no echo, so break the line here.
+  std::cout << "\n";
+
+  if (matches.empty()) {
+    std::cout << color::yellow << "Nothing matches \"" << query << "\".\n\n"
+              << color::reset;
+    return {};
+  }
+
+  const int today_days = today();
+  for (const std::size_t i : matches) {
+    print_card_row(deck.cards()[i], i + 1, today_days);
+  }
+  if (!query.empty()) {
+    std::cout << color::cyan << matches.size() << " of " << deck.size()
+              << " cards match. Numbers are deck positions.\n"
+              << color::reset;
+  }
+  std::cout << "\n";
+  return matches;
+}
+
+// Reads a card number and checks it against what was actually listed, so a
+// narrowed list can never be used to edit or delete a card it did not show.
+bool pick_listed(const std::vector<std::size_t>& listed, const char* verb,
+                 std::size_t* out) {
+  std::cout << "Enter the number of the flashcard to " << verb << ": ";
+  const int index = read_int();
+  if (index <= 0) {
+    std::cout << color::red << "Invalid index.\n\n" << color::reset;
+    return false;
+  }
+
+  const std::size_t position = static_cast<std::size_t>(index - 1);
+  if (std::find(listed.begin(), listed.end(), position) == listed.end()) {
+    std::cout << color::red << "Card " << index
+              << " is not in the list above.\n\n"
+              << color::reset;
+    return false;
+  }
+  *out = position;
+  return true;
+}
+
+void edit_flashcard(Deck& deck) {
+  const std::vector<std::size_t> listed = list_matching(deck);
+  if (listed.empty()) return;
+
+  std::size_t position = 0;
+  if (!pick_listed(listed, "edit", &position)) return;
+
+  edit_card_fields(deck.cards()[position]);
   autosave(deck);
   std::cout << color::green << "Flashcard updated!\n\n" << color::reset;
 }
 
 void delete_flashcard(Deck& deck) {
-  list_flashcards(deck);
-  if (deck.empty()) return;
-  std::cout << "Enter the number of the flashcard to delete: ";
-  const int index = read_int();
+  const std::vector<std::size_t> listed = list_matching(deck);
+  if (listed.empty()) return;
 
-  if (index <= 0 || index > static_cast<int>(deck.size())) {
-    std::cout << color::red << "Invalid index.\n\n" << color::reset;
-    return;
-  }
+  std::size_t position = 0;
+  if (!pick_listed(listed, "delete", &position)) return;
 
-  deck.remove(static_cast<size_t>(index - 1));
+  deck.remove(position);
   autosave(deck);
   std::cout << color::green << "Flashcard deleted!\n\n" << color::reset;
 }
+
+void find_flashcards(const Deck& deck) { list_matching(deck); }
 }  // namespace
 
 void manage_flashcards(Deck& deck) {
@@ -149,6 +209,7 @@ void manage_flashcards(Deck& deck) {
               << "1. List flashcards\n"
               << "2. Edit a flashcard\n"
               << "3. Delete a flashcard\n"
+              << "4. Find flashcards\n"
               << color::yellow << "q. Return to main menu\n"
               << "Choose: " << color::reset;
     std::string choice;
@@ -161,6 +222,8 @@ void manage_flashcards(Deck& deck) {
       edit_flashcard(deck);
     } else if (choice == "3") {
       delete_flashcard(deck);
+    } else if (choice == "4") {
+      find_flashcards(deck);
     } else if (choice == "q" || choice == "Q") {
       break;
     } else {

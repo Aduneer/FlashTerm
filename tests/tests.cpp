@@ -626,6 +626,53 @@ void test_remove() {
   EXPECT_EQ(deck.cards()[0].question, std::string("Second"));
 }
 
+void test_find() {
+  Deck deck(temp_path("find.txt"));
+  deck.add(Flashcard("la biblioteca", "library", {"spanish", "nouns"}));
+  deck.add(Flashcard("Which command stages a file?", "git add|add", {"git"}));
+  deck.add(Flashcard("el árbol", "tree", {"spanish"}));
+
+  // An empty query matches everything, in deck order.
+  EXPECT_EQ(deck.find("").size(), size_t{3});
+  EXPECT_EQ(deck.find("   ").size(), size_t{3});
+  EXPECT_EQ(deck.find("")[0], size_t{0});
+  EXPECT_EQ(deck.find("")[2], size_t{2});
+
+  // Question, answer and tag are all searched.
+  EXPECT_EQ(deck.find("biblioteca").size(), size_t{1});
+  EXPECT_EQ(deck.find("biblioteca")[0], size_t{0});
+  EXPECT_EQ(deck.find("library")[0], size_t{0});
+  EXPECT_EQ(deck.find("git").size(), size_t{1});
+  EXPECT_EQ(deck.find("git")[0], size_t{1});
+
+  // A tag shared by two cards returns both, still in deck order.
+  const std::vector<size_t> spanish = deck.find("spanish");
+  EXPECT_EQ(spanish.size(), size_t{2});
+  EXPECT_EQ(spanish[0], size_t{0});
+  EXPECT_EQ(spanish[1], size_t{2});
+
+  // Case-insensitive and substring, not whole-word.
+  EXPECT_EQ(deck.find("LIBRARY").size(), size_t{1});
+  EXPECT_EQ(deck.find("StAgEs").size(), size_t{1});
+  EXPECT_EQ(deck.find("libr").size(), size_t{1});
+
+  // Alternatives are searchable, since the answer is matched as stored.
+  EXPECT_EQ(deck.find("git add").size(), size_t{1});
+
+  // No match is empty rather than everything.
+  EXPECT_EQ(deck.find("python").size(), size_t{0});
+
+  // Non-ASCII matches by exact bytes, which is enough to find the card.
+  EXPECT_EQ(deck.find("árbol").size(), size_t{1});
+  EXPECT_EQ(deck.find("árbol")[0], size_t{2});
+
+  // Positions must survive a delete, which is why find returns indices the
+  // caller re-derives rather than caching.
+  EXPECT_TRUE(deck.remove(0));
+  EXPECT_EQ(deck.find("spanish").size(), size_t{1});
+  EXPECT_EQ(deck.find("spanish")[0], size_t{1});
+}
+
 void test_reverse_prompting() {
   Flashcard vocab("la biblioteca", "library");
 
@@ -731,6 +778,7 @@ int main() {
   test_stats();
   test_remove();
   test_cli_parsing();
+  test_find();
   test_reverse_prompting();
 
   std::cout << "\n" << (g_checks - g_failures) << "/" << g_checks

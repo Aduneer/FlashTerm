@@ -66,6 +66,8 @@ supported for staged installs if you are packaging FlashTerm.
 ```bash
 ./FlashTerm                    # default deck, created on first run
 ./FlashTerm path/to/deck.txt   # any other deck
+./FlashTerm --help             # usage
+./FlashTerm --version          # version
 ```
 
 Your decks are yours: `flashcards.txt` is deliberately not tracked by git, so
@@ -141,6 +143,7 @@ During a review, `u` undoes the last answer and `e` edits the current card.
 | `src/deck.*` | The `Deck` class: load, atomic save, import/export, tags, statistics |
 | `src/review.*` | Review session flow and the Leitner promotion rules |
 | `src/ui.*` | Menus, prompts and the statistics screen |
+| `src/cli.*` | Command-line parsing (`--help`, `--version`, deck path) |
 | `src/main.cpp` | Argument handling and the main menu loop |
 | `tests/tests.cpp` | Test suite (`make test`) |
 

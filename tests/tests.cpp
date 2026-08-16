@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "answer.h"
+#include "cli.h"
 #include "date.h"
 #include "deck.h"
 #include "schedule.h"
@@ -623,6 +624,46 @@ void test_remove() {
   EXPECT_EQ(deck.size(), size_t{1});
   EXPECT_EQ(deck.cards()[0].question, std::string("Second"));
 }
+
+CliOptions parse(std::vector<const char*> args) {
+  args.insert(args.begin(), "FlashTerm");
+  return parse_args(static_cast<int>(args.size()), args.data(), "default.txt");
+}
+
+void test_cli_parsing() {
+  // No arguments: the default deck.
+  EXPECT_TRUE(parse({}).action == CliAction::RunDeck);
+  EXPECT_EQ(parse({}).deck_path, std::string("default.txt"));
+
+  // A plain path is a deck.
+  EXPECT_TRUE(parse({"spanish.csv"}).action == CliAction::RunDeck);
+  EXPECT_EQ(parse({"spanish.csv"}).deck_path, std::string("spanish.csv"));
+
+  EXPECT_TRUE(parse({"-h"}).action == CliAction::ShowHelp);
+  EXPECT_TRUE(parse({"--help"}).action == CliAction::ShowHelp);
+  EXPECT_TRUE(parse({"-v"}).action == CliAction::ShowVersion);
+  EXPECT_TRUE(parse({"--version"}).action == CliAction::ShowVersion);
+
+  // The regression this module exists for: an unknown option must not become
+  // a deck path, which silently created a file named "--help".
+  EXPECT_TRUE(parse({"--nope"}).action == CliAction::Error);
+  EXPECT_TRUE(parse({"-x"}).action == CliAction::Error);
+  EXPECT_TRUE(parse({"-"}).action == CliAction::Error);
+  EXPECT_TRUE(parse({"--nope"}).deck_path.empty());
+
+  // "--" ends option parsing, so a dashed deck name is still reachable.
+  EXPECT_TRUE(parse({"--", "-deck.txt"}).action == CliAction::RunDeck);
+  EXPECT_EQ(parse({"--", "-deck.txt"}).deck_path, std::string("-deck.txt"));
+  EXPECT_TRUE(parse({"--", "--help"}).action == CliAction::RunDeck);
+
+  // One deck at a time, and no empty paths.
+  EXPECT_TRUE(parse({"a.txt", "b.txt"}).action == CliAction::Error);
+  EXPECT_TRUE(parse({""}).action == CliAction::Error);
+
+  // Errors and help both carry text worth printing.
+  EXPECT_TRUE(!parse({"--nope"}).error.empty());
+  EXPECT_TRUE(usage_text().find("--version") != std::string::npos);
+}
 }  // namespace
 
 int main() {
@@ -656,6 +697,7 @@ int main() {
   test_unique_tags();
   test_stats();
   test_remove();
+  test_cli_parsing();
 
   std::cout << "\n" << (g_checks - g_failures) << "/" << g_checks
             << " checks passed\n";

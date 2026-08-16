@@ -10,6 +10,7 @@
 #include "cli.h"
 #include "date.h"
 #include "deck.h"
+#include "review.h"
 #include "schedule.h"
 #include "text.h"
 
@@ -625,6 +626,38 @@ void test_remove() {
   EXPECT_EQ(deck.cards()[0].question, std::string("Second"));
 }
 
+void test_reverse_prompting() {
+  Flashcard vocab("la biblioteca", "library");
+
+  // Forward: ask the question, expect the answer.
+  EXPECT_EQ(prompt_text(vocab, false), std::string("la biblioteca"));
+  EXPECT_EQ(expected_answer(vocab, false), std::string("library"));
+
+  // Reversed: ask the answer, expect the question.
+  EXPECT_EQ(prompt_text(vocab, true), std::string("library"));
+  EXPECT_EQ(expected_answer(vocab, true), std::string("la biblioteca"));
+
+  // A reversed prompt shows only the first accepted answer, because
+  // "git add|add" is not a sensible thing to display.
+  Flashcard alts("Which command stages a file?", "git add|add");
+  EXPECT_EQ(prompt_text(alts, true), std::string("git add"));
+  EXPECT_EQ(expected_answer(alts, true),
+            std::string("Which command stages a file?"));
+
+  // Forward prompting is unaffected by alternatives.
+  EXPECT_EQ(prompt_text(alts, false), std::string("Which command stages a file?"));
+  EXPECT_EQ(expected_answer(alts, false), std::string("git add|add"));
+
+  // Reversing twice is the identity, so no direction loses information.
+  EXPECT_EQ(prompt_text(vocab, false), expected_answer(vocab, true));
+  EXPECT_EQ(prompt_text(vocab, true), expected_answer(vocab, false));
+
+  // The reversed answer is still matched with the usual typo tolerance.
+  EXPECT_TRUE(check_answer("la biblioteca", expected_answer(vocab, true)).exact);
+  EXPECT_TRUE(check_answer("La Biblioteca", expected_answer(vocab, true)).exact);
+  EXPECT_TRUE(check_answer("la bibliotecca", expected_answer(vocab, true)).near_miss);
+}
+
 CliOptions parse(std::vector<const char*> args) {
   args.insert(args.begin(), "FlashTerm");
   return parse_args(static_cast<int>(args.size()), args.data(), "default.txt");
@@ -698,6 +731,7 @@ int main() {
   test_stats();
   test_remove();
   test_cli_parsing();
+  test_reverse_prompting();
 
   std::cout << "\n" << (g_checks - g_failures) << "/" << g_checks
             << " checks passed\n";

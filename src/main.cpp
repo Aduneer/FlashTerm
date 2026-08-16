@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 
+#include "cli.h"
 #include "date.h"
 #include "deck.h"
 #include "review.h"
@@ -59,11 +60,26 @@ void run_export(const Deck& deck) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+  const CliOptions options = parse_args(argc, argv, kDefaultDeck);
+  switch (options.action) {
+    case CliAction::ShowHelp:
+      std::cout << usage_text();
+      return 0;
+    case CliAction::ShowVersion:
+      std::cout << "FlashTerm " << kVersion << "\n";
+      return 0;
+    case CliAction::Error:
+      std::cerr << "FlashTerm: " << options.error << "\n\n" << usage_text();
+      return 2;
+    case CliAction::RunDeck:
+      break;
+  }
+
   // Required before text widths can account for multi-byte characters.
   std::setlocale(LC_ALL, "");
   color::detect();
 
-  Deck deck((argc > 1) ? argv[1] : kDefaultDeck);
+  Deck deck(options.deck_path);
   if (!deck.load()) {
     std::cout << color::yellow << "Creating a new flashcard deck: "
               << deck.path() << color::reset << "\n\n";

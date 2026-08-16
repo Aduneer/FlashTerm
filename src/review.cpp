@@ -33,6 +33,13 @@ struct Filters {
   int leitner_box = 0;  // 0 means every box
 };
 
+// How this session was set up: which cards, and which way round they are asked.
+struct Session {
+  Filters filters;
+  int mode = kModeAll;
+  bool reversed = false;
+};
+
 std::mt19937& rng() {
   static std::mt19937 generator(std::random_device{}());
   return generator;
@@ -155,6 +162,19 @@ bool choose_filters(const Deck& deck, int today_days, Filters* filters,
   return true;
 }
 
+// Asked after the filters, so reversing composes with every review mode rather
+// than being a mode of its own: "difficult cards, reversed" is a useful session.
+bool choose_reversed() {
+  std::cout << color::cyan << "\n--- Prompt Direction ---\n"
+            << color::reset << color::yellow
+            << "[Enter] normal (question, you type the answer)\n"
+            << "     r  reversed (answer, you type the question)\n"
+            << "Choose: " << color::reset;
+  std::string input;
+  read_line(input);
+  return to_lowercase(trim(input)) == "r";
+}
+
 CardRefs collect_matches(Deck& deck, const Filters& filters, int today_days) {
   CardRefs matches;
   for (auto& card : deck.cards()) {
@@ -199,7 +219,7 @@ void order_by_due(CardRefs* refs) {
 }
 
 void print_header(const Flashcard& card, size_t position, size_t total,
-                  int today_days) {
+                  int today_days, bool reversed) {
   const int bar_width = 20;
   const int filled = static_cast<int>((position * bar_width) / total);
 
@@ -214,15 +234,19 @@ void print_header(const Flashcard& card, size_t position, size_t total,
   if (!card.tags.empty()) {
     std::cout << " | Tags: " << card.tags_to_string();
   }
+  if (reversed) {
+    std::cout << " | reversed";
+  }
   std::cout << "\n"
             << std::string(std::min(50, terminal_width()), '-') << "\n\n";
 }
 
-void print_correct_answer(const Flashcard& card) {
-  std::cout << color::red
-            << "\n❌ Incorrect! Correct answer: " << primary_answer(card.answer)
+// `shown` is already the single answer to display; `others` is empty when there
+// is nothing else to accept, which is always the case in a reversed session
+// because a question carries no alternatives.
+void print_correct_answer(const std::string& shown, const std::string& others) {
+  std::cout << color::red << "\n❌ Incorrect! Correct answer: " << shown
             << color::reset;
-  const std::string others = alternatives_summary(card.answer);
   if (!others.empty()) {
     std::cout << color::yellow << "  (also accepted: " << others << ")"
               << color::reset;
@@ -303,6 +327,14 @@ void report_nothing_due(const Deck& deck, int today_days) {
 }
 }  // namespace
 
+std::string prompt_text(const Flashcard& card, bool reversed) {
+  return reversed ? primary_answer(card.answer) : card.question;
+}
+
+std::string expected_answer(const Flashcard& card, bool reversed) {
+  return reversed ? card.question : card.answer;
+}
+
 void review_flashcards(Deck& deck) {
   if (deck.empty()) {
     std::cout << color::yellow << "No flashcards to review. Add some first!\n\n"
@@ -314,11 +346,12 @@ void review_flashcards(Deck& deck) {
   // internally consistent.
   const int today_days = today();
 
-  Filters filters;
-  int mode = kModeAll;
-  if (!choose_filters(deck, today_days, &filters, &mode)) {
+  Session session;
+  if (!choose_filters(deck, today_days, &session.filters, &session.mode)) {
     return;
   }
+  session.reversed = choose_reversed();
+  const Filters& filters = session.filters;
 
   CardRefs matches = collect_matches(deck, filters, today_days);
   if (matches.empty()) {
@@ -333,7 +366,7 @@ void review_flashcards(Deck& deck) {
   }
 
   std::shuffle(matches.begin(), matches.end(), rng());
-  if (mode == kModeBox && filters.leitner_box == 0) {
+  if (session.mode == kModeBox && filters.leitner_box == 0) {
     order_by_box(&matches);
   } else if (filters.due_only) {
     order_by_due(&matches);
@@ -345,13 +378,16 @@ void review_flashcards(Deck& deck) {
   size_t idx = 0;
   while (idx < matches.size()) {
     Flashcard& card = matches[idx].get();
+    const std::string expected = expected_answer(card, session.reversed);
     clear_screen();
-    print_header(card, idx + 1, matches.size(), today_days);
+    print_header(card, idx + 1, matches.size(), today_days, session.reversed);
 
-    std::cout << color::cyan << "Q: " << card.question << color::reset << "\n\n";
-    const std::string typed = prompt("Your answer: ");
+    std::cout << color::cyan << (session.reversed ? "A: " : "Q: ")
+              << prompt_text(card, session.reversed) << color::reset << "\n\n";
+    const std::string typed =
+        prompt(session.reversed ? "Your question: " : "Your answer: ");
 
-    const AnswerCheck check = check_answer(typed, card.answer);
+    const AnswerCheck check = check_answer(typed, expected);
     bool counted_correct = check.exact;
     if (counted_correct) {
       std::cout << color::green << "\n✅ Correct!" << color::reset << "\n";
@@ -369,7 +405,13 @@ void review_flashcards(Deck& deck) {
           counted_correct = true;
         }
       }
-      if (!counted_correct) print_correct_answer(card);
+      if (!counted_correct) {
+        // A question has no "|" alternatives, so a reversed session shows it
+        // verbatim rather than treating any pipe in it as a separator.
+        print_correct_answer(
+            session.reversed ? card.question : primary_answer(card.answer),
+            session.reversed ? std::string() : alternatives_summary(card.answer));
+      }
     }
 
     const CardState before = capture_state(card);

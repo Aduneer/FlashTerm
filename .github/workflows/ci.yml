@@ -1,0 +1,31 @@
+# Build FlashTerm and run its test suite on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    # Both compilers, so a warning or a standard-library difference that only
+    # one of them notices still fails the build.
+    strategy:
+      fail-fast: false
+      matrix:
+        cxx: [g++, clang++]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show compiler version
+        run: ${{ matrix.cxx }} --version
+
+      - name: Build
+        run: make CXX=${{ matrix.cxx }}
+
+      - name: Run tests
+        run: make test CXX=${{ matrix.cxx }}

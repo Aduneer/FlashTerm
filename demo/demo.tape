@@ -14,11 +14,17 @@
 Output demo/demo.gif
 
 Set Shell "bash"
-Set FontSize 18
-Set Width 1100
-# 800px fits the statistics dashboard, which is the tallest screen at 29 lines.
-# Anything shorter clips its title off the top.
-Set Height 800
+# Sized for GitHub, whose README column is about 880px: rendering wider than
+# that only makes the browser downscale it and soften the text. 900x720 at
+# FontSize 16 still fits the statistics dashboard, the tallest screen at 29
+# lines, and displays close to 1:1.
+# Note: Set Framerate has no effect on GIF output in vhs 0.11 — the file lands at
+# 25fps regardless. Not worth working around: halving the frame count externally
+# was measured at only 5% off the file size, because the cost is the dithered
+# progress bars and the sheer volume of distinct text, not the frame count.
+Set FontSize 16
+Set Width 900
+Set Height 720
 Set Padding 20
 Set Theme "Dracula"
 Set TypingSpeed 75ms

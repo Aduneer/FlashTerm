@@ -8,48 +8,19 @@ FlashTerm is a terminal flashcard app that makes you type the answer. No multipl
 
 ---
 
-## Key Features
+## Quick Start
 
-* **Spaced repetition (Leitner system)** — Flashcards are sorted into 5 boxes. Answering correctly promotes a card to the next box (up to Box 5); answering incorrectly demotes it back to Box 1. You can choose to review specific boxes or prioritize weaker boxes first.
-* **Real scheduling** — Each box carries a review interval, so a card you know well genuinely stops appearing until it is due again. The main menu shows how many cards are due, the default review mode drills exactly those, and the most overdue cards come first.
-
-  | Box | Next review after |
-  | --- | --- |
-  | 1 (weakest) | 1 day |
-  | 2 | 3 days |
-  | 3 | 7 days |
-  | 4 | 14 days |
-  | 5 (mastered) | 30 days |
-
-  Cards you have never reviewed are due immediately. Existing decks upgrade automatically — every card simply starts out due, keeping its box and scores.
-* **Tag system and interactive filtering** — Tag cards (e.g., `cpp; memory`) to filter reviews, picking tags by number or name.
-* **Reversed review** — Any review mode can be flipped, so you are shown the answer and have to produce the question. `la biblioteca` → `library` tests whether you can *read* Spanish; `library` → `la biblioteca` tests whether you can *speak* it, which is a harder and genuinely different skill. Both directions share one box and due date. Best combined with a tag filter: reversing `git init` into "which command creates a new repository?" is not a useful exercise.
-* **Search** — Find cards by any substring of the question, answer or tags. Editing and deleting search first rather than dumping the whole deck, and the numbers shown are always deck positions, so the number you type means the same thing whether or not you searched.
-* **Typo tolerance** — Levenshtein distance catches near misses. A minor typo prompts you to override it rather than counting it wrong.
-* **Multiple accepted answers** — Separate alternatives with `|` — `std::unique_ptr|unique_ptr` — and any of them counts. The first is shown back to you when you miss the card, the rest as also accepted.
-* **Undo and fix in place** — After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
-* **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`.
-* **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, and automatic flagging of your hardest card.
-* **CSV parser** — Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
-* **Crash-safe autosave** — The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
-* **EOF and pipe safety** — Piped or non-interactive input auto-saves and exits cleanly rather than looping. Colour and screen clears are suppressed when output is not a terminal, or when `NO_COLOR` is set.
-
-## Getting Started
-
-### Prerequisites
-
-* A C++ compiler supporting C++17 (e.g., `g++` or `clang++`)
-* `make` build utility
-
-### Building the Project
-
-Compile the application using the provided `Makefile`:
+Needs a C++17 compiler (`g++` or `clang++`) and `make`.
 
 ```bash
+git clone https://github.com/Aduneer/FlashTerm
+cd FlashTerm
 make
+./FlashTerm
 ```
 
-This creates an executable file named `FlashTerm`. Object files land in `build/`.
+That builds an executable named `FlashTerm`, with object files in `build/`, and
+drops you at the main menu with a new empty deck.
 
 ### Installing (optional)
 
@@ -91,27 +62,31 @@ than one answer, which is worth copying: `mañana` really does mean both
 *tomorrow* and *morning*, and `git init` should not be marked wrong because you
 typed `init`.
 
-### Running the Tests
+## Key Features
 
-```bash
-make test
-```
+* **Spaced repetition (Leitner system)** — Flashcards are sorted into 5 boxes. Answering correctly promotes a card to the next box (up to Box 5); answering incorrectly demotes it back to Box 1. You can choose to review specific boxes or prioritize weaker boxes first.
+* **Real scheduling** — Each box carries a review interval, so a card you know well genuinely stops appearing until it is due again. The main menu shows how many cards are due, the default review mode drills exactly those, and the most overdue cards come first.
 
-Covers the text and answer-matching utilities (normalisation, Levenshtein
-distance, CSV escaping, UTF-8 column widths, alternatives, undo round-trips),
-the scheduling logic (calendar arithmetic, leap years, box intervals, due
-dates), and the `Deck` persistence layer (atomic writes, write failures,
-lossless import/export, legacy-deck migration, statistics).
+  | Box | Next review after |
+  | --- | --- |
+  | 1 (weakest) | 1 day |
+  | 2 | 3 days |
+  | 3 | 7 days |
+  | 4 | 14 days |
+  | 5 (mastered) | 30 days |
 
-### Deck File Format
-
-One CSV record per card, with the last five fields optional:
-
-```
-question,answer,tags,correct,incorrect,box,last_reviewed,due_date
-```
-
-Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers may list alternatives separated by `|`. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
+  Cards you have never reviewed are due immediately. Existing decks upgrade automatically — every card simply starts out due, keeping its box and scores.
+* **Tag system and interactive filtering** — Tag cards (e.g., `cpp; memory`) to filter reviews, picking tags by number or name.
+* **Reversed review** — Any review mode can be flipped, so you are shown the answer and have to produce the question. `la biblioteca` → `library` tests whether you can *read* Spanish; `library` → `la biblioteca` tests whether you can *speak* it, which is a harder and genuinely different skill. Both directions share one box and due date. Best combined with a tag filter: reversing `git init` into "which command creates a new repository?" is not a useful exercise.
+* **Search** — Find cards by any substring of the question, answer or tags. Editing and deleting search first rather than dumping the whole deck, and the numbers shown are always deck positions, so the number you type means the same thing whether or not you searched.
+* **Typo tolerance** — Levenshtein distance catches near misses. A minor typo prompts you to override it rather than counting it wrong.
+* **Multiple accepted answers** — Separate alternatives with `|` — `std::unique_ptr|unique_ptr` — and any of them counts. The first is shown back to you when you miss the card, the rest as also accepted.
+* **Undo and fix in place** — After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
+* **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`.
+* **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, and automatic flagging of your hardest card.
+* **CSV parser** — Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
+* **Crash-safe autosave** — The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
+* **EOF and pipe safety** — Piped or non-interactive input auto-saves and exits cleanly rather than looping. Colour and screen clears are suppressed when output is not a terminal, or when `NO_COLOR` is set.
 
 ## Usage Guide
 
@@ -128,7 +103,31 @@ Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers
 
 During a review, `u` undoes the last answer and `e` edits the current card.
 
-## Project Layout
+## Deck File Format
+
+One CSV record per card, with the last five fields optional:
+
+```
+question,answer,tags,correct,incorrect,box,last_reviewed,due_date
+```
+
+Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers may list alternatives separated by `|`. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
+
+## Development
+
+### Running the Tests
+
+```bash
+make test
+```
+
+Covers the text and answer-matching utilities (normalisation, Levenshtein
+distance, CSV escaping, UTF-8 column widths, alternatives, undo round-trips),
+the scheduling logic (calendar arithmetic, leap years, box intervals, due
+dates), and the `Deck` persistence layer (atomic writes, write failures,
+lossless import/export, legacy-deck migration, statistics).
+
+### Project Layout
 
 | File | Responsibility |
 | --- | --- |

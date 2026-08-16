@@ -55,6 +55,15 @@ class Deck {
   void add(const Flashcard& card) { cards_.push_back(card); }
   bool remove(std::size_t index);
 
+  // Positions of the cards matching `query` as a case-insensitive substring of
+  // the question, the answer or any tag, in deck order. An empty query matches
+  // every card, so callers can treat "no search" as an unfiltered search.
+  //
+  // Positions, not copies: they stay valid for editing and deleting, and they
+  // are what gets shown to the user, so the number typed to pick a card means
+  // the same thing whether or not a search narrowed the list.
+  std::vector<std::size_t> find(const std::string& query) const;
+
   // Tags as first seen, de-duplicated case-insensitively, sorted A-Z.
   std::vector<std::string> unique_tags() const;
   int count_with_tag(const std::string& tag) const;

@@ -112,6 +112,30 @@ bool Deck::remove(std::size_t index) {
   return true;
 }
 
+std::vector<std::size_t> Deck::find(const std::string& query) const {
+  // to_lowercase only folds ASCII, so a search for accented or CJK text matches
+  // by exact bytes rather than case-insensitively. That is the right failure:
+  // "biblioteca" still finds "la biblioteca", and 犬 still finds 犬.
+  const std::string needle = to_lowercase(trim(query));
+
+  std::vector<std::size_t> matches;
+  for (std::size_t i = 0; i < cards_.size(); ++i) {
+    if (needle.empty()) {
+      matches.push_back(i);
+      continue;
+    }
+    const Flashcard& card = cards_[i];
+    bool matched = to_lowercase(card.question).find(needle) != std::string::npos ||
+                   to_lowercase(card.answer).find(needle) != std::string::npos;
+    for (const auto& tag : card.tags) {
+      if (matched) break;
+      matched = to_lowercase(tag).find(needle) != std::string::npos;
+    }
+    if (matched) matches.push_back(i);
+  }
+  return matches;
+}
+
 std::vector<std::string> Deck::unique_tags() const {
   std::vector<std::string> unique;
   std::set<std::string> seen;

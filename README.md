@@ -2,14 +2,14 @@
 
 [![CI](https://github.com/Aduneer/FlashTerm/actions/workflows/ci.yml/badge.svg)](https://github.com/Aduneer/FlashTerm/actions/workflows/ci.yml)
 
-A feature-rich, interactive C++ command-line application for creating, managing, and studying flashcards directly in your terminal. Designed for active recall, FlashTerm requires you to type answers manually to maximize memorization, and packages standard spaced repetition principles into a sleek terminal interface.
+FlashTerm is a terminal flashcard app that makes you type the answer. No multiple choice and no self-grading: you either produce it or you don't, which is the whole point of active recall. Cards move through five Leitner boxes, each with a real review interval, so a card you know stops appearing until it is due again.
 
 ---
 
 ## Key Features
 
-* 🧠 **Spaced Repetition (Leitner System)**: Flashcards are sorted into 5 boxes. Answering correctly promotes a card to the next box (up to Box 5); answering incorrectly demotes it back to Box 1. You can choose to review specific boxes or prioritize weaker boxes first.
-* 📅 **Real Scheduling**: Each box carries a review interval, so a card you know well genuinely stops appearing until it is due again. The main menu shows how many cards are due, the default review mode drills exactly those, and the most overdue cards come first.
+* **Spaced repetition (Leitner system)** — Flashcards are sorted into 5 boxes. Answering correctly promotes a card to the next box (up to Box 5); answering incorrectly demotes it back to Box 1. You can choose to review specific boxes or prioritize weaker boxes first.
+* **Real scheduling** — Each box carries a review interval, so a card you know well genuinely stops appearing until it is due again. The main menu shows how many cards are due, the default review mode drills exactly those, and the most overdue cards come first.
 
   | Box | Next review after |
   | --- | --- |
@@ -20,17 +20,15 @@ A feature-rich, interactive C++ command-line application for creating, managing,
   | 5 (mastered) | 30 days |
 
   Cards you have never reviewed are due immediately. Existing decks upgrade automatically — every card simply starts out due, keeping its box and scores.
-* 🏷️ **Tag System & Interactive Filtering**: Tag cards (e.g., `cpp; memory`) to filter reviews, picking tags by number or name.
-* ✍️ **Typo Tolerance**: Levenshtein distance catches near misses. A minor typo prompts you to override it rather than counting it wrong.
-* ✅ **Multiple Accepted Answers**: Separate alternatives with `|` — `std::unique_ptr|unique_ptr` — and any of them counts. The first is shown back to you when you miss the card, the rest as also accepted.
-* ↩️ **Undo & Fix In Place**: After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
-* 🗃️ **Custom Decks via CLI**: `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`.
-* 📊 **Deck Statistics Dashboard**: Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, and automatic flagging of your hardest card.
-* 🛡️ **Robust CSV Parser**: Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
-* 💾 **Crash-Safe Autosave**: The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
-* 🌀 **EOF and Pipe Safety**: Piped or non-interactive input auto-saves and exits cleanly rather than looping. Colour and screen clears are suppressed when output is not a terminal, or when `NO_COLOR` is set.
-
----
+* **Tag system and interactive filtering** — Tag cards (e.g., `cpp; memory`) to filter reviews, picking tags by number or name.
+* **Typo tolerance** — Levenshtein distance catches near misses. A minor typo prompts you to override it rather than counting it wrong.
+* **Multiple accepted answers** — Separate alternatives with `|` — `std::unique_ptr|unique_ptr` — and any of them counts. The first is shown back to you when you miss the card, the rest as also accepted.
+* **Undo and fix in place** — After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
+* **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`.
+* **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, and automatic flagging of your hardest card.
+* **CSV parser** — Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
+* **Crash-safe autosave** — The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
+* **EOF and pipe safety** — Piped or non-interactive input auto-saves and exits cleanly rather than looping. Colour and screen clears are suppressed when output is not a terminal, or when `NO_COLOR` is set.
 
 ## Getting Started
 
@@ -111,8 +109,6 @@ question,answer,tags,correct,incorrect,box,last_reviewed,due_date
 
 Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers may list alternatives separated by `|`. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
 
----
-
 ## Usage Guide
 
 | Menu | What it does |
@@ -127,8 +123,6 @@ Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers
 | 0. Save and exit | Saves and exits. (The deck is already saved after every change.) |
 
 During a review, `u` undoes the last answer and `e` edits the current card.
-
----
 
 ## Project Layout
 
@@ -151,8 +145,8 @@ During a review, `u` undoes the last answer and `e` edits the current card.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to open issues or submit pull requests.
+Issues and pull requests are welcome. `make test` should pass before you open one; CI runs it on gcc and clang.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).

@@ -14,10 +14,13 @@
 Output demo/demo.gif
 
 Set Shell "bash"
-# Sized for GitHub, whose README column is about 880px: rendering wider than
-# that only makes the browser downscale it and soften the text. 900x720 at
-# FontSize 16 still fits the statistics dashboard, the tallest screen at 29
-# lines, and displays close to 1:1.
+# 900x720 at FontSize 16 fits the statistics dashboard, which is the tallest
+# screen at 29 lines. Anything shorter clips its title off the top.
+#
+# The README displays this at width=640 to keep it from eating a whole screen of
+# scroll, so the extra native resolution is not wasted: it supersamples down
+# cleanly, and stays sharp on high-DPI displays where 640 CSS px is 1280 real
+# ones. Checked at 640: even the dashboard's numbers stay legible.
 # Note: Set Framerate has no effect on GIF output in vhs 0.11 — the file lands at
 # 25fps regardless. Not worth working around: halving the frame count externally
 # was measured at only 5% off the file size, because the cost is the dithered

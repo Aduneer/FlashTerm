@@ -1,5 +1,7 @@
 # FlashTerm 🚀
 
+[![CI](https://github.com/Aduneer/FlashTerm/actions/workflows/ci.yml/badge.svg)](https://github.com/Aduneer/FlashTerm/actions/workflows/ci.yml)
+
 A feature-rich, interactive C++ command-line application for creating, managing, and studying flashcards directly in your terminal. Designed for active recall, FlashTerm requires you to type answers manually to maximize memorization, and packages standard spaced repetition principles into a sleek terminal interface.
 
 ---
@@ -46,6 +48,18 @@ make
 ```
 
 This creates an executable file named `FlashTerm`. Object files land in `build/`.
+
+### Installing (optional)
+
+To run `FlashTerm` from anywhere instead of `./FlashTerm`:
+
+```bash
+sudo make install              # installs to /usr/local/bin
+make install PREFIX=~/.local   # or somewhere on your PATH, no sudo needed
+```
+
+`make uninstall` removes it again, and honours the same `PREFIX`. `DESTDIR` is
+supported for staged installs if you are packaging FlashTerm.
 
 ### Running
 

@@ -5,6 +5,11 @@ BUILD_DIR = build
 TARGET = FlashTerm
 TEST_TARGET = $(BUILD_DIR)/run_tests
 
+# Where `make install` puts the binary. DESTDIR is prepended for staged
+# installs, which is what distro packaging expects.
+PREFIX ?= /usr/local
+BINDIR = $(DESTDIR)$(PREFIX)/bin
+
 # Everything except main.cpp, so the tests can link against it.
 LIB_SRCS = $(filter-out $(SRC_DIR)/main.cpp,$(wildcard $(SRC_DIR)/*.cpp))
 SRCS = $(LIB_SRCS) $(SRC_DIR)/main.cpp
@@ -28,9 +33,16 @@ test: $(TEST_TARGET)
 $(TEST_TARGET): tests/tests.cpp $(LIB_OBJS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -I$(SRC_DIR) -o $@ tests/tests.cpp $(LIB_OBJS)
 
+install: $(TARGET)
+	mkdir -p $(BINDIR)
+	install -m 755 $(TARGET) $(BINDIR)/$(TARGET)
+
+uninstall:
+	rm -f $(BINDIR)/$(TARGET)
+
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
 
 -include $(OBJS:.o=.d)
 
-.PHONY: all test clean
+.PHONY: all test install uninstall clean

@@ -142,6 +142,7 @@ During a review, `u` undoes the last answer and `e` edits the current card.
 | `src/cli.*` | Command-line parsing (`--help`, `--version`, deck path) |
 | `src/main.cpp` | Argument handling and the main menu loop |
 | `tests/tests.cpp` | Test suite (`make test`) |
+| `demo/demo.tape` | Scripted [vhs](https://github.com/charmbracelet/vhs) recording behind the demo GIF: `vhs demo/demo.tape` |
 
 ---
 

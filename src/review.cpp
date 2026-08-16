@@ -97,7 +97,8 @@ bool choose_filters(const Deck& deck, int today_days, Filters* filters,
   const DeckStats stats = deck.stats(today_days);
 
   std::cout << color::cyan << "\n--- Review Options ---\n"
-            << "1. Review cards DUE now (" << stats.due_count << " cards)\n"
+            << "1. Review cards DUE now ("
+            << count_label(stats.due_count, "card", "cards") << ")\n"
             << "2. Review ALL cards\n"
             << "3. Review by TAGS\n"
             << "4. Review DIFFICULT cards (incorrect > correct)\n"
@@ -131,7 +132,9 @@ bool choose_filters(const Deck& deck, int today_days, Filters* filters,
     }
     for (size_t i = 0; i < available.size(); ++i) {
       std::cout << "  " << i + 1 << ". " << available[i] << " ("
-                << deck.count_with_tag(available[i]) << " cards)\n";
+                << count_label(deck.count_with_tag(available[i]), "card",
+                               "cards")
+                << ")\n";
     }
     for (const auto& tag : select_tags(available)) {
       filters->tags_lower.push_back(to_lowercase(tag));
@@ -145,7 +148,8 @@ bool choose_filters(const Deck& deck, int today_days, Filters* filters,
     std::cout << color::cyan << "\n--- Select Leitner Box ---\n" << color::reset;
     for (int box = 1; box <= kMaxBox; ++box) {
       std::cout << "  " << box << ". Box " << box << " ("
-                << stats.box_counts[box] << " cards, reviewed every "
+                << count_label(stats.box_counts[box], "card", "cards")
+                << ", reviewed every "
                 << interval_for_box(box) << " days)\n";
     }
     std::cout << "  0. Review ALL boxes (prioritizing lower boxes)\n"

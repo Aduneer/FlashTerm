@@ -475,6 +475,28 @@ void test_card_audio_column() {
   EXPECT_EQ(reparsed.audio, awkward.audio);
 }
 
+void test_last_nonempty_line() {
+  // The case that was wrong first time: one line with no newline before it,
+  // which is the shape of most short error messages, lost its last character.
+  EXPECT_EQ(last_nonempty_line("could not load model"),
+            std::string("could not load model"));
+  EXPECT_EQ(last_nonempty_line("could not load model\n"),
+            std::string("could not load model"));
+
+  // A traceback: every line but the last says which file and which function.
+  EXPECT_EQ(last_nonempty_line("Traceback:\n  File x\nModuleNotFoundError: q\n"),
+            std::string("ModuleNotFoundError: q"));
+
+  // Trailing blank lines are not the message.
+  EXPECT_EQ(last_nonempty_line("first\nsecond\n\n\n"), std::string("second"));
+  EXPECT_EQ(last_nonempty_line("only\n   \n"), std::string("only"));
+
+  // Nothing to report is reported as nothing, not as whitespace.
+  EXPECT_EQ(last_nonempty_line(""), std::string(""));
+  EXPECT_EQ(last_nonempty_line("\n\n"), std::string(""));
+  EXPECT_EQ(last_nonempty_line("   \t\n"), std::string(""));
+}
+
 void test_voice_discovery() {
   const std::string directory = temp_path("voices");
   mkdir(directory.c_str(), 0755);
@@ -1596,6 +1618,7 @@ int main() {
   test_due_counts_and_next_due();
   test_card_csv();
   test_card_audio_column();
+  test_last_nonempty_line();
   test_voice_discovery();
   test_audio_path_resolution();
   test_save_load_roundtrip();

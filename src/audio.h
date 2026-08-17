@@ -39,8 +39,13 @@ std::string player_name();
 //
 //   piper -m fr_FR-siwis-medium -f {out}
 //   espeak-ng -v fr --stdin -w {out}
+// When `diagnostics` is given, whatever the command wrote to standard error is
+// stored there. Worth having because the useful part of a failure is always in
+// there and never in the exit code: a missing voice package, for instance,
+// fails as a Python traceback whose last line says exactly what to install.
 bool render(const Command& command, const std::string& text,
-            const std::string& output_path);
+            const std::string& output_path,
+            std::string* diagnostics = nullptr);
 
 // What FLASHTERM_TTS_RENDER asks for, or empty when it is unset or names a
 // program that is not on the PATH. An explicit setting always wins over the

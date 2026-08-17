@@ -68,6 +68,16 @@ std::string count_label(int count, const std::string& singular,
   return std::to_string(count) + " " + (count == 1 ? singular : plural);
 }
 
+std::string last_nonempty_line(const std::string& text) {
+  const std::size_t end = text.find_last_not_of(" \t\r\n");
+  if (end == std::string::npos) return {};
+  const std::size_t newline = text.find_last_of('\n', end);
+  // Off by one here dropped the final character of any single-line message,
+  // which is exactly the shape of the short errors most commands produce.
+  const std::size_t start = (newline == std::string::npos) ? 0 : newline + 1;
+  return text.substr(start, end - start + 1);
+}
+
 std::vector<std::string> split(const std::string& str, char delimiter) {
   std::vector<std::string> parts;
   if (str.empty()) {

@@ -1,4 +1,5 @@
 #include <clocale>
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <string>
@@ -60,7 +61,8 @@ void run_export(const Deck& deck) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  const CliOptions options = parse_args(argc, argv, kDefaultDeck);
+  const CliOptions options = parse_args(
+      argc, argv, deck_from_env(std::getenv("FLASHTERM_DECK"), kDefaultDeck));
   switch (options.action) {
     case CliAction::ShowHelp:
       std::cout << usage_text();

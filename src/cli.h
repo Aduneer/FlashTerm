@@ -28,6 +28,18 @@ struct CliOptions {
 CliOptions parse_args(int argc, const char* const argv[],
                       const std::string& default_deck);
 
+// The deck to study when the command line does not name one: `env_value` if it
+// is set and not empty, otherwise `fallback`. This is what $FLASHTERM_DECK is
+// for — a deck kept in a synced directory can be studied as plain `FlashTerm`
+// from anywhere, without retyping the path or cd-ing to it.
+//
+// Takes the value rather than reading the environment itself, so the rule is
+// testable without a process-wide setenv. An unset and an empty variable mean
+// the same thing; the value is otherwise used verbatim, because a path is
+// allowed to contain surprising characters and second-guessing it would make
+// some legitimate filenames unreachable.
+std::string deck_from_env(const char* env_value, const std::string& fallback);
+
 // Usage text for --help, also shown when usage is wrong.
 std::string usage_text();
 }  // namespace FlashTerm

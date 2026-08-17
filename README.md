@@ -43,10 +43,12 @@ supported for staged installs if you are packaging FlashTerm.
 ./FlashTerm path/to/deck.txt   # any other deck
 ./FlashTerm --help             # usage
 ./FlashTerm --version          # version
+
+export FLASHTERM_DECK=~/Sync/spanish.txt   # the deck to use when none is named
 ```
 
-Your decks are yours: `flashcards.txt` is deliberately not tracked by git, so
-studying never shows up as a source change.
+Your decks are yours: `flashcards.txt` and every `.log` are deliberately not
+tracked by git, so studying never shows up as a source change.
 
 ### Starter Decks
 
@@ -84,7 +86,8 @@ typed `init`.
 * **Typo tolerance** — Levenshtein distance catches near misses. A minor typo prompts you to override it rather than counting it wrong.
 * **Multiple accepted answers** — Separate alternatives with `|` — `std::unique_ptr|unique_ptr` — and any of them counts. The first is shown back to you when you miss the card, the rest as also accepted.
 * **Undo and fix in place** — After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
-* **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`.
+* **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`, or whatever `FLASHTERM_DECK` points at.
+* **Works with the sync tool you already have** — Decks are plain text and saves are atomic, so Syncthing, Dropbox, `rsync` or git sync a deck between machines with no support needed from FlashTerm. See [Syncing Between Machines](#syncing-between-machines).
 * **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, automatic flagging of your hardest card, and how much you reviewed today alongside your current daily streak.
 * **Review log** — Every answer is appended to a `deck.txt.log` beside the deck: what was asked, which way round, whether you got it, and when, to the second. The card counters say what a card's state *is*; the log says what actually happened, which is what streaks, retention over time and merging two machines' reviews all need. It is append-only, so it never rewrites history and never conflicts.
 * **CSV parser** — Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
@@ -147,6 +150,53 @@ c9072b87405e0369,2fb76783d6b65f93,2026-08-17T09:50:49Z,n,correct,1,2,
 Losing or deleting the log costs you the history, not the deck: cards keep
 their own counters and schedule.
 
+## Syncing Between Machines
+
+There is no sync server and no account. A deck is a text file, so the tool you
+already use for files works: **Syncthing, Dropbox, iCloud Drive, `rsync`, or a
+git repo**. Saves are atomic — written to a temporary file and renamed into
+place — so a sync client watching the directory can never catch a half-written
+deck and never has to guess whether a file is finished.
+
+Put the deck somewhere synced and point `FLASHTERM_DECK` at it, so you can just
+run `FlashTerm` from anywhere on either machine:
+
+```bash
+# ~/.bashrc or ~/.zshrc, on every machine
+export FLASHTERM_DECK="$HOME/Sync/decks/spanish.txt"
+```
+
+A deck named on the command line still wins, so `FlashTerm other.txt` keeps
+working. Sync **both** files — the deck and its `.log` — since the log is where
+your streak and review history live:
+
+```
+~/Sync/decks/spanish.txt
+~/Sync/decks/spanish.txt.log
+```
+
+### The one thing to watch out for
+
+**Reviewing on two machines before they have synced loses one side's
+scheduling.** The deck is saved as a whole file, so whichever machine writes
+last replaces the other's copy entirely, and the box moves and due dates the
+losing machine recorded go with it. Nothing is corrupted and no cards are lost
+— it is ordinary last-writer-wins — but the reviews are.
+
+The rule that avoids it completely: **finish a session, let it sync, then start
+on the other machine.** For most people that is simply how it already works.
+
+The review log behaves better, because appending is not overwriting. Each
+machine's log stays complete on its own, and since the file only ever grows,
+sync clients handle it far more gracefully than the deck — git in particular
+merges append-only files cleanly, where deck lines conflict. So even when a
+deck write is lost, the record of *what you actually answered* usually is not.
+
+Reconstructing the deck from merged logs — the thing that would make concurrent
+review on two machines genuinely safe — is deliberately not wired up yet.
+`merge_events()` and `replay()` in `src/event.h` are the working, tested halves
+of it, waiting on the command that will call them.
+
 ## Development
 
 ### Running the Tests
@@ -159,9 +209,9 @@ Covers the text and answer-matching utilities (normalisation, Levenshtein
 distance, CSV escaping, UTF-8 column widths, alternatives, undo round-trips),
 the scheduling logic (calendar arithmetic, leap years, box intervals, due
 dates), the `Deck` persistence layer (atomic writes, write failures, lossless
-import/export, legacy-deck migration, statistics), and the review log (event
+import/export, legacy-deck migration, statistics), the review log (event
 round-trips, damaged lines, card ids, streaks, and merging and replaying two
-machines' logs).
+machines' logs), and command-line and environment handling.
 
 ### Project Layout
 

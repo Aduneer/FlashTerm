@@ -1,0 +1,12 @@
+--- output ---
+Rendering audio for 1 card in deck.txt
+  FAILED    audio/<ID1>.wav  Bonjour
+            piper:_error:_could_not_load_model
+
+0 rendered, 0 skipped, 1 failed
+--- exit status ---
+1
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>
+--- file voices/fr_FR-siwis-medium.onnx ---
+model bytes

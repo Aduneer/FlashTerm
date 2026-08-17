@@ -7,6 +7,7 @@
 #include <string>
 
 #include "audio.h"
+#include "text.h"
 #include "voice.h"
 
 namespace FlashTerm {
@@ -35,6 +36,22 @@ void ensure_directory(const std::string& path) {
 
 bool file_exists(const std::string& path) {
   return access(path.c_str(), R_OK) == 0;
+}
+
+// Failures that are worth translating, because the message is accurate and
+// still leaves someone stuck. Piper's Japanese voices phonemize through
+// pyopenjtalk, which `pipx install piper-tts` does not bring with it, so a
+// Japanese deck fails on its first card with a bare ModuleNotFoundError.
+std::string hint_for(const std::string& diagnostics) {
+  if (diagnostics.find("pyopenjtalk") != std::string::npos) {
+    return
+        "That voice needs a phonemizer that piper does not install by "
+        "default:\n\n"
+        "  pipx inject piper-tts pyopenjtalk\n\n"
+        "It downloads a dictionary the first time it runs, so the first card "
+        "is slow.\n";
+  }
+  return {};
 }
 }  // namespace
 
@@ -76,9 +93,9 @@ GenerateResult generate_audio(Deck& deck, const std::string& voice, bool force,
   // generated from may not have been through that yet.
   deck.ensure_ids();
 
-  const std::string directory =
-      deck.resolve(kAudioDirectory);
+  const std::string directory = deck.resolve(kAudioDirectory);
   bool changed = false;
+  bool reported = false;
 
   for (Flashcard& card : deck.cards()) {
     const std::string relative =
@@ -92,7 +109,8 @@ GenerateResult generate_audio(Deck& deck, const std::string& voice, bool force,
     }
 
     ensure_directory(directory);
-    if (audio::render(renderer, card.question, absolute)) {
+    std::string diagnostics;
+    if (audio::render(renderer, card.question, absolute, &diagnostics)) {
       // Only recorded in the deck once the file is really there, so a run that
       // dies partway through leaves no card pointing at nothing.
       if (card.audio != relative) {
@@ -104,6 +122,25 @@ GenerateResult generate_audio(Deck& deck, const std::string& voice, bool force,
     } else {
       errors << "  FAILED    " << relative << "  " << card.question << "\n";
       ++result.failed;
+
+      // Said once. The reason is nearly always the same for every card, and a
+      // traceback repeated five hundred times buries the one thing to read.
+      if (!reported) {
+        reported = true;
+        const std::string reason = last_nonempty_line(diagnostics);
+        if (!reason.empty()) errors << "            " << reason << "\n";
+        const std::string hint = hint_for(diagnostics);
+        if (!hint.empty()) errors << "\n" << hint << "\n";
+      }
+
+      // Nothing has worked yet and three cards have now failed, which is a
+      // misconfiguration rather than a difficult card. Stopping beats spawning
+      // a synthesiser once per card for a deck of five hundred to watch every
+      // one of them fail the same way.
+      if (result.rendered == 0 && result.failed >= 3) {
+        errors << "\nStopped after three failures without a success.\n";
+        break;
+      }
     }
   }
 

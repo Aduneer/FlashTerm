@@ -6,6 +6,27 @@
 # "-f <out>", and writes the text it was given on standard input to <out>, the
 # same way fake-audio.sh does for the FLASHTERM_TTS_RENDER path.
 
+# Fails on demand, so that a case can test what someone is told when rendering
+# goes wrong. "pyopenjtalk" reproduces the real thing: piper's Japanese voices
+# phonemize through a package it does not install, and the failure arrives as a
+# Python traceback whose last line is the only useful part of it.
+if [ -n "${FAKE_PIPER_FAIL:-}" ]; then
+  cat >/dev/null
+  if [ "$FAKE_PIPER_FAIL" = pyopenjtalk ]; then
+    cat >&2 <<'ERR'
+Traceback (most recent call last):
+  File "piper/voice.py", line 243, in phonemize
+    phonemizer = JapanesePhonemizer()
+  File "piper/phonemize_japanese.py", line 141, in __init__
+    import pyopenjtalk
+ModuleNotFoundError: No module named 'pyopenjtalk'
+ERR
+  else
+    printf '%s\n' "$FAKE_PIPER_FAIL" >&2
+  fi
+  exit 1
+fi
+
 out=
 model=
 while [ $# -gt 0 ]; do

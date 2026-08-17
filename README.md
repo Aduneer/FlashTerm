@@ -305,10 +305,23 @@ command you put in `FLASHTERM_TTS_RENDER` as a separate process, so piper's
 GPL-3.0 licence applies to piper and FlashTerm stays MIT — and swapping in a
 different engine is a one-line change, not a fork.
 
-Two caveats worth knowing. Piper's only Japanese voice produced an empty file in
-testing, so Japanese decks are better served by `espeak-ng` or real recordings
-for now. And a recording only ever matches the question it was rendered from —
-edit a card's question and its audio is stale until you `--force`.
+#### Japanese
+
+Piper's Japanese voice needs one extra package, because it phonemizes through
+`pyopenjtalk` rather than through espeak like the others, and `pipx install
+piper-tts` does not bring it along:
+
+```bash
+pipx inject piper-tts pyopenjtalk
+```
+
+The first card is then slow — it downloads a pronunciation dictionary of about
+23 MB once — and after that Japanese works like any other language, kanji
+included. Without it, rendering fails with a `ModuleNotFoundError`;
+FlashTerm recognises that particular failure and tells you the command above.
+
+One general caveat: a recording only ever matches the question it was rendered
+from. Edit a card's question and its audio is stale until you `--force`.
 
 **Choosing a voice for live speech.** The defaults are whatever is installed, tried in order:
 `espeak-ng`, `espeak`, `say`, `flite` for speech, and `mpv`, `ffplay`, `paplay`,

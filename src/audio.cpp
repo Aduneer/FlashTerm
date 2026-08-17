@@ -6,6 +6,7 @@
 
 #include <cerrno>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <sstream>
 #include <vector>
@@ -139,11 +140,21 @@ bool run(const Command& command, const std::string& final_argument) {
 // Same as run(), but the text goes to the child on standard input and the
 // arguments are used as given rather than having one appended. Rendering needs
 // both: where to write is an argument, what to say is not.
-bool run_with_input(const Command& command, const std::string& input) {
+bool run_with_input(const Command& command, const std::string& input,
+                    std::string* diagnostics) {
   if (command.empty()) return false;
 
+  // A temporary file rather than a pipe, because the parent is busy writing to
+  // the child's standard input: a pipe that filled up while nobody was reading
+  // it would deadlock the two of them against each other. tmpfile() unlinks
+  // immediately, so nothing is left behind however the run ends.
+  FILE* captured = (diagnostics != nullptr) ? tmpfile() : nullptr;
+
   int pipe_fds[2];
-  if (pipe(pipe_fds) != 0) return false;
+  if (pipe(pipe_fds) != 0) {
+    if (captured != nullptr) fclose(captured);
+    return false;
+  }
 
   std::vector<char*> argv;
   argv.reserve(command.size() + 1);
@@ -156,6 +167,7 @@ bool run_with_input(const Command& command, const std::string& input) {
   if (pid < 0) {
     close(pipe_fds[0]);
     close(pipe_fds[1]);
+    if (captured != nullptr) fclose(captured);
     return false;
   }
   if (pid == 0) {
@@ -163,13 +175,15 @@ bool run_with_input(const Command& command, const std::string& input) {
     dup2(pipe_fds[0], STDIN_FILENO);
     close(pipe_fds[0]);
     // Rendering is a batch operation with its own progress output, so the
-    // synthesiser's chatter is suppressed the same way playback's is.
+    // synthesiser's chatter is kept off the terminal -- but kept, rather than
+    // discarded, when the caller wants to be able to explain a failure.
     const int null = open("/dev/null", O_WRONLY);
     if (null >= 0) {
       dup2(null, STDOUT_FILENO);
       dup2(null, STDERR_FILENO);
       if (null > STDERR_FILENO) close(null);
     }
+    if (captured != nullptr) dup2(fileno(captured), STDERR_FILENO);
     execvp(argv[0], argv.data());
     _exit(127);
   }
@@ -194,10 +208,25 @@ bool run_with_input(const Command& command, const std::string& input) {
   signal(SIGPIPE, previous);
 
   int status = 0;
+  bool waited = true;
   while (waitpid(pid, &status, 0) < 0) {
-    if (errno != EINTR) return false;
+    if (errno != EINTR) {
+      waited = false;
+      break;
+    }
   }
-  return WIFEXITED(status) && WEXITSTATUS(status) == 0 &&
+
+  if (captured != nullptr) {
+    rewind(captured);
+    char buffer[4096];
+    std::size_t read_bytes = 0;
+    while ((read_bytes = fread(buffer, 1, sizeof(buffer), captured)) > 0) {
+      diagnostics->append(buffer, read_bytes);
+    }
+    fclose(captured);
+  }
+
+  return waited && WIFEXITED(status) && WEXITSTATUS(status) == 0 &&
          written == input.size();
 }
 
@@ -241,9 +270,9 @@ bool runnable(const Command& command) {
 }
 
 bool render(const Command& command, const std::string& text,
-            const std::string& output_path) {
+            const std::string& output_path, std::string* diagnostics) {
   if (command.empty() || text.empty()) return false;
-  return run_with_input(substitute(command, output_path), text);
+  return run_with_input(substitute(command, output_path), text, diagnostics);
 }
 
 bool play(const std::string& file, const std::string& text) {

@@ -15,6 +15,13 @@ std::string normalize_answer(const std::string& str);
 std::string count_label(int count, const std::string& singular,
                         const std::string& plural);
 
+// The last line with anything on it, trailing blank lines ignored. What it is
+// for: a command that fails writes its explanation to standard error at
+// length, and the last line is the one worth repeating -- a Python traceback
+// says which file and which function on every line but the one that names the
+// error.
+std::string last_nonempty_line(const std::string& text);
+
 std::vector<std::string> split(const std::string& str, char delimiter);
 int levenshtein_distance(const std::string& s1, const std::string& s2);
 

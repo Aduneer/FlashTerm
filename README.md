@@ -95,6 +95,7 @@ typed `init`.
 * **Framed cards** — The card under review is drawn in a box, centred in the window, with long questions wrapped to fit. Widths are measured in terminal columns rather than bytes, so the border still lines up on Japanese or accented cards — which is exactly where most tools get it wrong.
 * **Hints** — Stuck at a blank prompt, press `?` to reveal the first letter and the shape of the rest: `l·  ··········`. It counts as a *partial* — the card holds its box instead of advancing, since you produced the answer but not unaided. The session summary gives partials their own line rather than filing them under either neighbour, so you can see how much of a session leant on the hint.
 * **No dead ends** — `q` ends a review session from either prompt; leaving a card unanswered records nothing rather than counting it wrong. Every line prompt cancels on a bare Enter. Review keys are withheld on cards that accept them as answers, so a deck of vim keys or regex metacharacters stays reviewable.
+* **Audio** — Press `a` during a review to hear the card: a recording if it has one, spoken by `espeak-ng` or whatever else is installed if it does not. Nothing is linked against and nothing is required — with no player and no synthesiser on the machine, the key is simply never offered. See [Audio](#audio).
 * **Themes** — `FLASHTERM_THEME=ocean` or `sunset` repaints the palette; `NO_COLOR` still wins over both.
 * **CSV parser** — Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
 * **Crash-safe autosave** — The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
@@ -157,10 +158,10 @@ and exit.
 
 ## Deck File Format
 
-One CSV record per card, with the last six fields optional:
+One CSV record per card, with the last seven fields optional:
 
 ```
-question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id
+question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id,audio
 ```
 
 Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers may list alternatives separated by `|`. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
@@ -169,6 +170,12 @@ Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers
 in automatically the first time a deck is loaded, so hand-written decks can
 leave it off, and it stays the same when you edit the card — a fixed typo does
 not orphan the card's history.
+
+`audio` is a recording of the *question*, as a path relative to the deck file —
+so a deck and the audio directory beside it can be moved or synced as one thing.
+It is written only when a card has one, which means a deck with no audio comes
+out byte for byte as earlier versions wrote it, and syncing between a machine
+that has updated and one that has not does not put the whole file in conflict.
 
 ### Review Log Format
 
@@ -196,6 +203,46 @@ c9072b87405e0369,2fb76783d6b65f93,2026-08-17T09:50:49Z,n,correct,1,2,
 
 Losing or deleting the log costs you the history, not the deck: cards keep
 their own counters and schedule.
+
+## Audio
+
+Press `a` while a card is on screen to hear it. Nothing needs setting up, and
+nothing needs installing — if the machine has neither a player nor a speech
+synthesiser, review just never offers the key.
+
+A card can point at a recording, in the deck's tenth column:
+
+```
+Bonjour,Hello,french,0,0,1,,,,audio/bonjour.mp3
+```
+
+The path is relative to the deck file, so `mydeck.txt` and the `audio/`
+directory beside it travel together. Set it from inside the app by pressing `e`
+on a card during review, or write it into the deck by hand. A card with no
+recording is spoken instead, so a plain text deck has working audio from the
+moment it is created.
+
+**What plays, and when.** `a` plays what is on screen. In a normal review that
+is the question, so you hear the recording. In a reversed review the question is
+the thing you are being asked to produce, and playing it would hand you the
+answer — so `a` speaks the *answer* on screen instead, and the question's
+recording becomes available at the prompt after you have answered. That prompt
+is where `a` is most useful anyway: it is the moment you find out what the word
+was, and want to know how it sounds.
+
+**Choosing a voice.** The defaults are whatever is installed, tried in order:
+`espeak-ng`, `espeak`, `say`, `flite` for speech, and `mpv`, `ffplay`, `paplay`,
+`pw-play`, `mpg123`, `afplay`, `aplay` for files. Override either one, including
+arguments:
+
+```bash
+FLASHTERM_TTS="espeak-ng -v fr" FlashTerm french.txt
+FLASHTERM_PLAYER="mpv --no-video --volume=70" FlashTerm french.txt
+```
+
+The command is split on whitespace and run directly — never through a shell —
+and the text or path is appended as its last argument. A card whose question is
+`rm -rf ~` is a card about shell quoting and stays one.
 
 ## Syncing Between Machines
 
@@ -275,7 +322,9 @@ left behind — against a checked-in copy. That covers `ui.cpp` and `review.cpp`
 which are hard to reach any other way.
 
 Adding a case means creating a directory under `tests/golden/cases/` with an
-`input` file, optionally a starting `deck.txt` and an `args` file, and then:
+`input` file, optionally a starting `deck.txt`, an `args` file, an `env` file of
+`KEY=VALUE` lines, and an `audio/` directory for the deck's audio column to
+point at, and then:
 
 ```bash
 tests/golden/run.sh --update    # write the expected transcripts
@@ -299,6 +348,23 @@ The harness sets it, so a case need not. Leave it unset — as every real run
 does — and the shuffle stays random; an unparseable value falls back to random
 too, so a typo in a shell profile cannot quietly pin every session to one order.
 
+Audio is pinned the same way and for the same reason. Which keys review offers
+depends on what the machine can play, so a transcript recorded on a laptop with
+`espeak-ng` would not match one recorded on CI, which has nothing. The harness
+points `FLASHTERM_TTS` and `FLASHTERM_PLAYER` at `tests/golden/fake-audio.sh`,
+which appends what it was asked to play to `played.txt` in the working directory
+— and since the harness emits every file the run left behind, the transcript
+ends up recording exactly what was handed to the player:
+
+```
+--- file played.txt ---
+speak: Hello
+play: audio/bonjour.wav
+```
+
+A case that needs to test the *absence* of audio sets the two variables empty
+and `PATH=/nonexistent` in its `env` file; see `review-no-audio`.
+
 These tests work because every input path falls back to reading whole lines
 when stdin is not a terminal, and colour, screen clearing and vertical centring
 all switch off when stdout is not a terminal. Keep it that way: a golden test
@@ -314,6 +380,7 @@ cannot drive an app that insists on a tty.
 | `src/schedule.*` | Box intervals, due checks, and the Leitner move for an answer |
 | `src/text.*` | String, CSV and UTF-8 column helpers (no I/O) |
 | `src/terminal.*` | Colour detection, screen clearing, terminal width |
+| `src/audio.*` | Finding a player or synthesiser on the PATH, and running it |
 | `src/event.*` | The append-only review log: events, ids, timestamps, merge and replay |
 | `src/deck.*` | The `Deck` class: load, atomic save, import/export, tags, statistics |
 | `src/review.*` | Review session flow and the Leitner promotion rules |

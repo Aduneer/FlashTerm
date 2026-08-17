@@ -35,39 +35,13 @@ Loaded 1 flashcards from deck.txt
 └──────────────────────────────────────────────────────────────┘
 
 [Enter] submit   [a] play audio   [?] hint   [q] end session
-Your answer: Progress: [████████████████████] 100% (1/1 cards)
-
-┌──────────────────────────────────────────────────────────────┐
-│ Box 1 · new · french                                         │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│   Bonjour                                                    │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-
-Hint: H····
-[Enter] submit   [a] play audio   [q] end session
-Your answer: 
-✅ Correct!
-Counted as a partial — the hint means this card stays where it is.
-Next review in 1 day (<DATE1>).
-
-[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
-> Progress: [████████████████████] 100% (1/1 cards)
-
-┌──────────────────────────────────────────────────────────────┐
-│ Box 1 · new · french                                         │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│   Bonjour                                                    │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-
-[Enter] submit   [a] play audio   [?] hint   [q] end session
 Your answer: 
 ✅ Correct!
 Card promoted to Box 2!
-Next review in 3 days (<DATE2>).
+Next review in 3 days (<DATE1>).
+
+[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
+> Enter new question (current: Bonjour): Enter new answer (current: Hello) [use | to accept alternatives]: Enter new tags (semicolon;separated, current: french): Enter audio path, relative to the deck (current: none) ["none" to clear]: Card updated.
 
 [Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
 > ==================================================
@@ -96,8 +70,6 @@ Next review in 3 days (<DATE2>).
 --- exit status ---
 0
 --- file deck.txt ---
-Bonjour,Hello,french,1,0,2,<DATE3>,<DATE2>,<ID1>
+Bonjour,Hello,french,1,0,2,<DATE2>,<DATE1>,<ID1>,audio/bonjour.wav
 --- file deck.txt.log ---
-<ID2>,<ID1>,<TIME>,n,partial,1,1,
-<ID3>,<ID1>,<TIME>,n,undo,1,1,<ID2>
-<ID4>,<ID1>,<TIME>,n,correct,1,2,
+<ID2>,<ID1>,<TIME>,n,correct,1,2,

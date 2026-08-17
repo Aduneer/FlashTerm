@@ -166,10 +166,19 @@ void edit_card_fields(Flashcard& card) {
   const std::string tags_str =
       prompt("Enter new tags (semicolon;separated, current: " +
              card.tags_to_string() + "): ");
+  const std::string audio =
+      prompt("Enter audio path, relative to the deck (current: " +
+             (card.audio.empty() ? std::string("none") : card.audio) +
+             ") [\"none\" to clear]: ");
 
   if (!question.empty()) card.question = question;
   if (!answer.empty()) card.answer = answer;
   if (!tags_str.empty()) card.tags = split(tags_str, ';');
+  // Every other field here keeps its value on a bare Enter, which leaves no
+  // way to take a path back off a card; "none" is that way.
+  if (!audio.empty()) {
+    card.audio = (to_lowercase(audio) == "none") ? std::string() : audio;
+  }
 }
 
 namespace {

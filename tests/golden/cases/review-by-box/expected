@@ -42,12 +42,12 @@ Loaded 4 flashcards from deck.txt
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 
-[Enter] submit   [?] hint   [q] end session
+[Enter] submit   [a] play audio   [?] hint   [q] end session
 Your answer: 
 ❌ Incorrect! Correct answer: Thanks
 Next review in 1 day (<DATE1>).
 
-[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
 > Progress: [██████████░░░░░░░░░░] 50% (2/4 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -58,12 +58,12 @@ Next review in 1 day (<DATE1>).
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 
-[Enter] submit   [?] hint   [q] end session
+[Enter] submit   [a] play audio   [?] hint   [q] end session
 Your answer: 
 ❌ Incorrect! Correct answer: Dog
 Next review in 1 day (<DATE1>).
 
-[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
 > Progress: [███████████████░░░░░] 75% (3/4 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -74,13 +74,13 @@ Next review in 1 day (<DATE1>).
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 
-[Enter] submit   [?] hint   [q] end session
+[Enter] submit   [a] play audio   [?] hint   [q] end session
 Your answer: 
 ❌ Incorrect! Correct answer: Cat
 Card demoted back to Box 1!
 Next review in 1 day (<DATE1>).
 
-[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
 > Progress: [████████████████████] 100% (4/4 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -91,13 +91,13 @@ Next review in 1 day (<DATE1>).
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 
-[Enter] submit   [?] hint   [q] end session
+[Enter] submit   [a] play audio   [?] hint   [q] end session
 Your answer: 
 ❌ Incorrect! Correct answer: Hello
 Card demoted back to Box 1!
 Next review in 1 day (<DATE1>).
 
-[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
 > ==================================================
                  REVIEW COMPLETE                  
 ==================================================

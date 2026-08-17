@@ -6,6 +6,8 @@ FlashTerm is a terminal flashcard app that makes you type the answer. No multipl
 
 <img src="demo/demo.gif" width="640" alt="FlashTerm review session: a due card is answered with a typo, which is offered as an override rather than marked wrong; the card is promoted a Leitner box; then the statistics dashboard and a reversed review">
 
+<sub>Recorded with <a href="https://github.com/charmbracelet/vhs">vhs</a> from <a href="demo/demo.tape">demo/demo.tape</a> — scripted, so it can be re-rendered whenever the UI changes.</sub>
+
 ---
 
 ## Quick Start
@@ -83,7 +85,8 @@ typed `init`.
 * **Multiple accepted answers** — Separate alternatives with `|` — `std::unique_ptr|unique_ptr` — and any of them counts. The first is shown back to you when you miss the card, the rest as also accepted.
 * **Undo and fix in place** — After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
 * **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`.
-* **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, and automatic flagging of your hardest card.
+* **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, automatic flagging of your hardest card, and how much you reviewed today alongside your current daily streak.
+* **Review log** — Every answer is appended to a `deck.txt.log` beside the deck: what was asked, which way round, whether you got it, and when, to the second. The card counters say what a card's state *is*; the log says what actually happened, which is what streaks, retention over time and merging two machines' reviews all need. It is append-only, so it never rewrites history and never conflicts.
 * **CSV parser** — Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
 * **Crash-safe autosave** — The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
 * **EOF and pipe safety** — Piped or non-interactive input auto-saves and exits cleanly rather than looping. Colour and screen clears are suppressed when output is not a terminal, or when `NO_COLOR` is set.
@@ -95,7 +98,7 @@ typed `init`.
 | 1. Add flashcard | Question, answer and semicolon-separated tags. Use `\|` for alternative answers. |
 | 2. Review flashcards | Pick a mode: **due** cards (most overdue first), **all** (shuffled), by **tag**, **difficult** only (incorrect > correct), or by **box**. Then pick a direction: Enter for normal, `r` to be shown the answer and type the question. |
 | 3. Manage flashcards | List, edit, delete or **find** cards. Editing and deleting ask for a search term first, so you never scroll a 200-card list to reach one card. Numbers shown are deck positions, and a card the search did not list cannot be edited or deleted by number. |
-| 4. Display progress | Deck statistics, due counts, box distribution, hardest card, per-card rates. |
+| 4. Display progress | Deck statistics, due counts, reviews today, daily streak, box distribution, hardest card, per-card rates. |
 | 5. Import flashcards | Append cards from a `.csv` file. |
 | 6. Export flashcards | Write the deck to `.csv`, review history included, so it re-imports without losing progress. |
 | 7. List unique Tags | Every tag in the deck, sorted, with card counts. |
@@ -105,13 +108,44 @@ During a review, `u` undoes the last answer and `e` edits the current card.
 
 ## Deck File Format
 
-One CSV record per card, with the last five fields optional:
+One CSV record per card, with the last six fields optional:
 
 ```
-question,answer,tags,correct,incorrect,box,last_reviewed,due_date
+question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id
 ```
 
 Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers may list alternatives separated by `|`. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
+
+`id` is 16 hex characters identifying the card for the review log. It is filled
+in automatically the first time a deck is loaded, so hand-written decks can
+leave it off, and it stays the same when you edit the card — a fixed typo does
+not orphan the card's history.
+
+### Review Log Format
+
+Alongside `mydeck.txt`, FlashTerm keeps `mydeck.txt.log`: one CSV record per
+answer, appended and never rewritten.
+
+```
+id,card_id,timestamp,direction,result,box_before,box_after,undoes
+```
+
+```
+c9072b87405e0369,2fb76783d6b65f93,2026-08-17T09:50:49Z,n,correct,1,2,
+818d2231293bb6d7,2fb76783d6b65f93,2026-08-17T09:51:02Z,,undo,1,1,c9072b87405e0369
+```
+
+* `timestamp` is UTC to the second, so events from two machines sort into one
+  order regardless of timezone. Due dates stay whole days; only the log is
+  finer-grained than that.
+* `direction` is `n` for a normal prompt and `r` for a reversed one.
+* `result` is `correct`, `incorrect`, or `undo`. An answer you take back with
+  `u` is *recorded* as undone rather than erased — a line that may already have
+  been synced elsewhere cannot be unwritten — and undone answers are excluded
+  from every statistic.
+
+Losing or deleting the log costs you the history, not the deck: cards keep
+their own counters and schedule.
 
 ## Development
 
@@ -124,8 +158,10 @@ make test
 Covers the text and answer-matching utilities (normalisation, Levenshtein
 distance, CSV escaping, UTF-8 column widths, alternatives, undo round-trips),
 the scheduling logic (calendar arithmetic, leap years, box intervals, due
-dates), and the `Deck` persistence layer (atomic writes, write failures,
-lossless import/export, legacy-deck migration, statistics).
+dates), the `Deck` persistence layer (atomic writes, write failures, lossless
+import/export, legacy-deck migration, statistics), and the review log (event
+round-trips, damaged lines, card ids, streaks, and merging and replaying two
+machines' logs).
 
 ### Project Layout
 
@@ -137,6 +173,7 @@ lossless import/export, legacy-deck migration, statistics).
 | `src/schedule.*` | Box intervals, due checks, and the Leitner move for an answer |
 | `src/text.*` | String, CSV and UTF-8 column helpers (no I/O) |
 | `src/terminal.*` | Colour detection, screen clearing, terminal width |
+| `src/event.*` | The append-only review log: events, ids, timestamps, merge and replay |
 | `src/deck.*` | The `Deck` class: load, atomic save, import/export, tags, statistics |
 | `src/review.*` | Review session flow and the Leitner promotion rules |
 | `src/ui.*` | Menus, prompts and the statistics screen |

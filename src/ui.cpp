@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "date.h"
+#include "event.h"
 #include "schedule.h"
 #include "terminal.h"
 #include "text.h"
@@ -279,6 +280,16 @@ void display_progress(const Deck& deck) {
             << " (" << stats.total_correct << " Correct, "
             << stats.total_incorrect << " Incorrect)\n  Due Now:              "
             << stats.due_count << "\n";
+
+  // From the log rather than the counters: these are questions about *when*
+  // reviews happened, which the counters cannot answer at all.
+  const LogStats log_stats = summarize(deck.log().events(), today_days);
+  std::cout << "  Reviewed Today:       " << log_stats.reviewed_today << " ("
+            << log_stats.correct_today << " Correct, "
+            << (log_stats.reviewed_today - log_stats.correct_today)
+            << " Incorrect)\n  Current Streak:       "
+            << count_label(log_stats.current_streak, "day", "days") << "\n";
+
   if (stats.next_due != kNoDate) {
     std::cout << "  Next Card Due:        "
               << describe_due(stats.next_due, today_days) << " ("

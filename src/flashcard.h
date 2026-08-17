@@ -19,6 +19,11 @@ class Flashcard {
   int last_reviewed = kNoDate;
   int due_date = kNoDate;
 
+  // Stable identity, so the review log can still name this card after it has
+  // been edited, moved or had cards deleted around it. Empty until the card
+  // joins a deck, which is what mints it; see Deck::ensure_ids.
+  std::string id;
+
   Flashcard(const std::string& q, const std::string& a,
             const std::vector<std::string>& t = {}, int correct = 0,
             int incorrect = 0, int leitner = 1);

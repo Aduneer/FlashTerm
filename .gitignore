@@ -7,6 +7,10 @@
 # Atomic-save leftovers from an interrupted write
 *.tmp
 
-# Personal decks. The default deck is study data, not source: it changes on
-# every review. Starter decks live in examples/ and are imported, not edited.
+# Personal decks and their review logs. The default deck is study data, not
+# source: it changes on every review. Starter decks live in examples/ and are
+# imported, not edited.
 /flashcards.txt
+
+# Review logs, which sit beside whichever deck file they belong to.
+*.log

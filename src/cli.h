@@ -9,16 +9,21 @@ inline constexpr char kVersion[] = "0.1.0";
 // What the command line asked for. Anything that is not RunDeck is handled and
 // exited on immediately, before a deck is touched.
 enum class CliAction {
-  RunDeck,      // Study `deck_path`.
-  ShowHelp,     // --help: usage to stdout, exit 0.
-  ShowVersion,  // --version: version to stdout, exit 0.
-  Error,        // Bad usage: `error` to stderr, exit 2.
+  RunDeck,        // Study `deck_path`.
+  GenerateAudio,  // --generate-audio: render the deck's audio, then exit.
+  ShowHelp,       // --help: usage to stdout, exit 0.
+  ShowVersion,    // --version: version to stdout, exit 0.
+  Error,          // Bad usage: `error` to stderr, exit 2.
 };
 
 struct CliOptions {
   CliAction action = CliAction::RunDeck;
   std::string deck_path;
   std::string error;
+
+  // --force, which only means anything alongside --generate-audio: re-render
+  // cards that already have a recording, so a deck can pick up a better voice.
+  bool force = false;
 };
 
 // Parses argv, treating a leading-dash argument as an option rather than a deck

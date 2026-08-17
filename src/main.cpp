@@ -7,6 +7,7 @@
 #include "cli.h"
 #include "date.h"
 #include "deck.h"
+#include "generate.h"
 #include "review.h"
 #include "terminal.h"
 #include "text.h"
@@ -108,6 +109,7 @@ int main(int argc, char* argv[]) {
     case CliAction::Error:
       std::cerr << "FlashTerm: " << options.error << "\n\n" << usage_text();
       return 2;
+    case CliAction::GenerateAudio:
     case CliAction::RunDeck:
       break;
   }
@@ -115,6 +117,22 @@ int main(int argc, char* argv[]) {
   // Required before text widths can account for multi-byte characters.
   std::setlocale(LC_ALL, "");
   color::detect();
+
+  if (options.action == CliAction::GenerateAudio) {
+    Deck deck(options.deck_path);
+    // Refusing beats creating an empty deck and reporting nothing to do: the
+    // likely cause is a mistyped path, and generating is not how a deck is
+    // meant to come into existence.
+    if (!deck.load()) {
+      std::cerr << "FlashTerm: no deck at " << deck.path() << "\n";
+      return 2;
+    }
+    std::cout << "Rendering audio for "
+              << count_label(static_cast<int>(deck.size()), "card", "cards")
+              << " in " << deck.path() << "\n";
+    return generate_audio(deck, options.force, std::cout, std::cerr)
+        .exit_code();
+  }
 
   Deck deck(options.deck_path);
   if (!deck.load()) {

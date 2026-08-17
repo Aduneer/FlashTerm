@@ -95,7 +95,7 @@ typed `init`.
 * **Framed cards** — The card under review is drawn in a box, centred in the window, with long questions wrapped to fit. Widths are measured in terminal columns rather than bytes, so the border still lines up on Japanese or accented cards — which is exactly where most tools get it wrong.
 * **Hints** — Stuck at a blank prompt, press `?` to reveal the first letter and the shape of the rest: `l·  ··········`. It counts as a *partial* — the card holds its box instead of advancing, since you produced the answer but not unaided. The session summary gives partials their own line rather than filing them under either neighbour, so you can see how much of a session leant on the hint.
 * **No dead ends** — `q` ends a review session from either prompt; leaving a card unanswered records nothing rather than counting it wrong. Every line prompt cancels on a bare Enter. Review keys are withheld on cards that accept them as answers, so a deck of vim keys or regex metacharacters stays reviewable.
-* **Audio** — Press `a` during a review to hear the card: a recording if it has one, spoken by `espeak-ng` or whatever else is installed if it does not. Nothing is linked against and nothing is required — with no player and no synthesiser on the machine, the key is simply never offered. See [Audio](#audio).
+* **Audio** — Press `a` during a review to hear the card: a recording if it has one, spoken by `espeak-ng` or whatever else is installed if it does not. `--generate-audio` renders a whole deck ahead of time with a good neural voice such as [Piper](https://github.com/OHF-voice/piper1-gpl). Nothing is linked against and nothing is required — with no player and no synthesiser on the machine, the key is simply never offered. See [Audio](#audio).
 * **Themes** — `FLASHTERM_THEME=ocean` or `sunset` repaints the palette; `NO_COLOR` still wins over both.
 * **CSV parser** — Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
 * **Crash-safe autosave** — The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
@@ -230,7 +230,71 @@ recording becomes available at the prompt after you have answered. That prompt
 is where `a` is most useful anyway: it is the moment you find out what the word
 was, and want to know how it sounds.
 
-**Choosing a voice.** The defaults are whatever is installed, tried in order:
+### Generating recordings
+
+Speaking a card live is instant but robotic. Better voices are too slow to run
+mid-review — around a second a card — so they are rendered once, ahead of time:
+
+```bash
+export FLASHTERM_TTS_RENDER="piper -m fr_FR-siwis-medium -f {out}"
+FlashTerm french.txt --generate-audio
+```
+
+```
+Rendering audio for 3 cards in french.txt
+  rendered  audio/37e2df4b5396755a.wav  Bonjour
+  rendered  audio/6cb389b96a2611d1.wav  Merci beaucoup
+  rendered  audio/6476afccfb900dea.wav  Au revoir
+
+3 rendered, 0 skipped, 0 failed
+```
+
+Files land in an `audio/` directory beside the deck and the paths are written
+into the audio column. It is safe to re-run — cards that already have a
+recording are skipped, so adding ten cards to a deck of five hundred renders
+ten. `--force` re-renders everything, which is how a deck picks up a better
+voice or a fixed typo.
+
+Files are named after the card's id rather than its question, because an id is
+already unique and already ASCII — `¿Dónde está la estación?` is a filename only
+on a generous filesystem. The deck's audio column is what maps one to the other.
+
+`FLASHTERM_TTS_RENDER` names the synthesiser: `{out}` is replaced with the file
+to write, and the text arrives on standard input. That one convention fits both
+candidates, and anything else that can read stdin and write a file:
+
+```bash
+FLASHTERM_TTS_RENDER="piper -m fr_FR-siwis-medium -f {out}"
+FLASHTERM_TTS_RENDER="espeak-ng -v fr --stdin -w {out}"
+```
+
+There is deliberately no default. A voice implies a language, and guessing one
+would render a French deck in English without saying so.
+
+#### Getting piper
+
+```bash
+pipx install piper-tts
+python3 -m piper.download_voices fr_FR-siwis-medium
+```
+
+[Piper](https://github.com/OHF-voice/piper1-gpl) is a neural text-to-speech
+system from the Home Assistant authors. It runs offline, needs no GPU, and its
+voices are dramatically better than `espeak-ng` for language learning — which is
+the whole point of hearing a card. Voices are about 60 MB each and cover 30-odd
+languages; browse them with `python3 -m piper.download_voices --help`.
+
+FlashTerm does not bundle, link against, or require piper. It runs whatever
+command you put in `FLASHTERM_TTS_RENDER` as a separate process, so piper's
+GPL-3.0 licence applies to piper and FlashTerm stays MIT — and swapping in a
+different engine is a one-line change, not a fork.
+
+Two caveats worth knowing. Piper's only Japanese voice produced an empty file in
+testing, so Japanese decks are better served by `espeak-ng` or real recordings
+for now. And a recording only ever matches the question it was rendered from —
+edit a card's question and its audio is stale until you `--force`.
+
+**Choosing a voice for live speech.** The defaults are whatever is installed, tried in order:
 `espeak-ng`, `espeak`, `say`, `flite` for speech, and `mpv`, `ffplay`, `paplay`,
 `pw-play`, `mpg123`, `afplay`, `aplay` for files. Override either one, including
 arguments:
@@ -381,6 +445,7 @@ cannot drive an app that insists on a tty.
 | `src/text.*` | String, CSV and UTF-8 column helpers (no I/O) |
 | `src/terminal.*` | Colour detection, screen clearing, terminal width |
 | `src/audio.*` | Finding a player or synthesiser on the PATH, and running it |
+| `src/generate.*` | `--generate-audio`: rendering a deck's recordings in bulk |
 | `src/event.*` | The append-only review log: events, ids, timestamps, merge and replay |
 | `src/deck.*` | The `Deck` class: load, atomic save, import/export, tags, statistics |
 | `src/review.*` | Review session flow and the Leitner promotion rules |
@@ -396,6 +461,21 @@ cannot drive an app that insists on a tty.
 ## Contributing
 
 Issues and pull requests are welcome. `make check` should pass before you open one; CI runs both suites on gcc and clang.
+
+## Credits
+
+FlashTerm has no dependencies and bundles no third-party code. It can, however,
+be pointed at other people's work, and that work deserves naming:
+
+* **[Piper](https://github.com/OHF-voice/piper1-gpl)** by the Home Assistant
+  authors — the neural text-to-speech behind `--generate-audio`, and the reason
+  a language deck can sound like a person rather than a modem. GPL-3.0-or-later.
+* **[eSpeak NG](https://github.com/espeak-ng/espeak-ng)** — the fallback voice,
+  and what makes audio work on a machine where nothing has been set up.
+  GPL-3.0-or-later.
+
+Both are invoked as separate programs, never linked or redistributed, so their
+licences apply to them and not to FlashTerm.
 
 ## License
 

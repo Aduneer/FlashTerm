@@ -1,0 +1,107 @@
+#include "generate.h"
+
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <ostream>
+#include <string>
+
+#include "audio.h"
+
+namespace FlashTerm {
+namespace {
+// Recordings go in a directory beside the deck rather than next to it, so that
+// a deck of a few hundred cards does not bury the deck file itself.
+constexpr char kAudioDirectory[] = "audio";
+
+// Named after the card's id rather than its question. An id is already unique
+// and already ASCII, which a question is neither: two cards may legitimately
+// ask the same thing with different tags, and "¿Dónde está la estación?" is a
+// filename only on a filesystem that is feeling generous. The cost is a
+// directory that cannot be read at a glance, which is what the deck's audio
+// column is for.
+std::string audio_file_for(const Flashcard& card) {
+  return std::string(kAudioDirectory) + "/" + card.id + ".wav";
+}
+
+// mkdir rather than a check-then-create, so two runs racing each other cannot
+// both decide the directory is missing. Anything other than "it is already
+// there" is left to the render itself to report, since it will fail too and
+// its message names the actual file.
+void ensure_directory(const std::string& path) {
+  mkdir(path.c_str(), 0755);
+}
+
+bool file_exists(const std::string& path) {
+  return access(path.c_str(), R_OK) == 0;
+}
+}  // namespace
+
+GenerateResult generate_audio(Deck& deck, bool force, std::ostream& out,
+                              std::ostream& errors) {
+  GenerateResult result;
+
+  if (audio::renderer_name().empty()) {
+    errors << "FlashTerm: FLASHTERM_TTS_RENDER is not set to a runnable "
+              "command.\n\n"
+              "It names the synthesiser, with {out} for the file to write and "
+              "the text arriving\non standard input. For example:\n\n"
+              "  FLASHTERM_TTS_RENDER=\"piper -m fr_FR-siwis-medium -f {out}\"\n"
+              "  FLASHTERM_TTS_RENDER=\"espeak-ng -v fr --stdin -w {out}\"\n\n"
+              "There is no default because a voice implies a language, and "
+              "guessing it would\nrender a French deck in English.\n";
+    result.failed = 1;
+    return result;
+  }
+
+  // A card is named by its id, so every card needs one before anything can be
+  // written. Loading a deck normally mints them; a deck loaded and immediately
+  // generated from may not have been through that yet.
+  deck.ensure_ids();
+
+  const std::string directory =
+      deck.resolve(kAudioDirectory);
+  bool changed = false;
+
+  for (Flashcard& card : deck.cards()) {
+    const std::string relative =
+        card.audio.empty() ? audio_file_for(card) : card.audio;
+    const std::string absolute = deck.resolve(relative);
+
+    if (!force && !card.audio.empty() && file_exists(absolute)) {
+      out << "  skipped   " << relative << "  (exists)\n";
+      ++result.skipped;
+      continue;
+    }
+
+    ensure_directory(directory);
+    if (audio::render(card.question, absolute)) {
+      // Only recorded in the deck once the file is really there, so a run that
+      // dies partway through leaves no card pointing at nothing.
+      if (card.audio != relative) {
+        card.audio = relative;
+        changed = true;
+      }
+      out << "  rendered  " << relative << "  " << card.question << "\n";
+      ++result.rendered;
+    } else {
+      errors << "  FAILED    " << relative << "  " << card.question << "\n";
+      ++result.failed;
+    }
+  }
+
+  if (changed) {
+    std::string error;
+    if (!deck.save(&error)) {
+      errors << "FlashTerm: could not save " << deck.path() << ": " << error
+             << "\n";
+      ++result.failed;
+    }
+  }
+
+  out << "\n"
+      << result.rendered << " rendered, " << result.skipped << " skipped, "
+      << result.failed << " failed\n";
+  return result;
+}
+}  // namespace FlashTerm

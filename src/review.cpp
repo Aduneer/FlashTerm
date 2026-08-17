@@ -61,11 +61,13 @@ bool card_has_any_tag(const Flashcard& card,
 
 // Accepts either list positions ("1, 3") or tag names, comma or space separated.
 std::vector<std::string> select_tags(const std::vector<std::string>& available) {
-  std::cout << color::cyan << "\n--- Select Tags to Review ---\n"
-            << color::reset;
+  // The one prompt in the review flow that takes more than a key, because a
+  // tag filter is a list — so it says so rather than leaving the user waiting
+  // for a keypress to be enough.
+  std::cout << "Numbers or names, separated by commas or spaces. "
+            << "Enter to confirm.\n";
   std::string tag_input =
-      prompt(std::string(color::yellow) +
-             "Enter numbers (e.g. 1, 3) or names of tags: " + color::reset);
+      prompt(std::string(color::yellow) + "> " + color::reset);
 
   std::vector<std::string> inputs = split(tag_input, ',');
   if (inputs.size() == 1 && inputs[0].find(' ') != std::string::npos) {
@@ -97,18 +99,17 @@ bool choose_filters(const Deck& deck, int today_days, Filters* filters,
                     int* mode) {
   const DeckStats stats = deck.stats(today_days);
 
-  std::cout << color::cyan << "\n--- Review Options ---\n"
-            << "1. Review cards DUE now ("
-            << count_label(stats.due_count, "card", "cards") << ")\n"
-            << "2. Review ALL cards\n"
-            << "3. Review by TAGS\n"
-            << "4. Review DIFFICULT cards (incorrect > correct)\n"
-            << "5. Review by LEITNER BOX (Focus on weaker boxes)\n"
-            << color::yellow << "q. go back\n"
-            << "Choose review mode: " << color::reset;
+  print_menu("Review", {{"1", "Due now  (" +
+                                  count_label(stats.due_count, "card", "cards") +
+                                  ")"},
+                        {"2", "All cards"},
+                        {"3", "By tag"},
+                        {"4", "Difficult only  (incorrect > correct)"},
+                        {"5", "By Leitner box, weakest first"},
+                        {"q", "Back to the main menu"}});
+  print_prompt();
 
-  std::string mode_input;
-  read_line(mode_input);
+  const std::string mode_input = read_choice();
   if (mode_input == "q" || mode_input == "Q") {
     clear_screen();
     return false;
@@ -131,12 +132,15 @@ bool choose_filters(const Deck& deck, int today_days, Filters* filters,
                 << color::reset;
       return true;
     }
+    std::vector<MenuItem> tags;
     for (size_t i = 0; i < available.size(); ++i) {
-      std::cout << "  " << i + 1 << ". " << available[i] << " ("
-                << count_label(deck.count_with_tag(available[i]), "card",
-                               "cards")
-                << ")\n";
+      tags.push_back({std::to_string(i + 1),
+                      available[i] + "  (" +
+                          count_label(deck.count_with_tag(available[i]), "card",
+                                      "cards") +
+                          ")"});
     }
+    print_menu("Select Tags", tags);
     for (const auto& tag : select_tags(available)) {
       filters->tags_lower.push_back(to_lowercase(tag));
     }
@@ -146,16 +150,25 @@ bool choose_filters(const Deck& deck, int today_days, Filters* filters,
               << "Reviewing cards you find difficult (Incorrect > Correct).\n"
               << color::reset;
   } else if (*mode == kModeBox) {
-    std::cout << color::cyan << "\n--- Select Leitner Box ---\n" << color::reset;
+    std::vector<MenuItem> boxes;
     for (int box = 1; box <= kMaxBox; ++box) {
-      std::cout << "  " << box << ". Box " << box << " ("
-                << count_label(stats.box_counts[box], "card", "cards")
-                << ", reviewed every "
-                << interval_for_box(box) << " days)\n";
+      boxes.push_back(
+          {std::to_string(box),
+           "Box " + std::to_string(box) + "  (" +
+               count_label(stats.box_counts[box], "card", "cards") +
+               ", reviewed every " +
+               count_label(interval_for_box(box), "day", "days") + ")"});
     }
-    std::cout << "  0. Review ALL boxes (prioritizing lower boxes)\n"
-              << color::yellow << "Choose Box: " << color::reset;
-    filters->leitner_box = read_int();
+    boxes.push_back({"0", "All boxes, weakest first"});
+    print_menu("Select a Box", boxes);
+    print_prompt();
+    try {
+      filters->leitner_box = std::stoi(read_choice());
+    } catch (const std::invalid_argument&) {
+      filters->leitner_box = 0;
+    } catch (const std::out_of_range&) {
+      filters->leitner_box = 0;
+    }
     if (filters->leitner_box < 0 || filters->leitner_box > kMaxBox) {
       filters->leitner_box = 0;
     }
@@ -170,14 +183,11 @@ bool choose_filters(const Deck& deck, int today_days, Filters* filters,
 // Asked after the filters, so reversing composes with every review mode rather
 // than being a mode of its own: "difficult cards, reversed" is a useful session.
 bool choose_reversed() {
-  std::cout << color::cyan << "\n--- Prompt Direction ---\n"
-            << color::reset << color::yellow
-            << "[Enter] normal (question, you type the answer)\n"
-            << "     r  reversed (answer, you type the question)\n"
-            << "Choose: " << color::reset;
-  std::string input;
-  read_line(input);
-  return to_lowercase(trim(input)) == "r";
+  print_menu("Prompt Direction",
+             {{"Enter", "Normal — question shown, you type the answer"},
+              {"r", "Reversed — answer shown, you type the question"}});
+  print_prompt();
+  return to_lowercase(read_choice()) == "r";
 }
 
 CardRefs collect_matches(Deck& deck, const Filters& filters, int today_days) {
@@ -223,8 +233,7 @@ void order_by_due(CardRefs* refs) {
                    });
 }
 
-void print_header(const Flashcard& card, size_t position, size_t total,
-                  int today_days, bool reversed) {
+void print_progress(size_t position, size_t total) {
   const int bar_width = 20;
   const int filled = static_cast<int>((position * bar_width) / total);
 
@@ -234,16 +243,92 @@ void print_header(const Flashcard& card, size_t position, size_t total,
   }
   std::cout << "] " << (position * 100) / total << "% (" << position << "/"
             << total << " cards)\n"
-            << "Box: " << card.leitner_box << " | Due: "
-            << describe_due(card.due_date, today_days);
+            << color::reset;
+}
+
+// "Box 2  ·  due today  ·  spanish  ·  reversed"
+std::string card_summary(const Flashcard& card, int today_days, bool reversed) {
+  std::string summary = "Box " + std::to_string(card.leitner_box) + "  ·  " +
+                        describe_due(card.due_date, today_days);
   if (!card.tags.empty()) {
-    std::cout << " | Tags: " << card.tags_to_string();
+    summary += "  ·  " + card.tags_to_string();
   }
   if (reversed) {
-    std::cout << " | reversed";
+    summary += "  ·  reversed";
   }
-  std::cout << "\n"
-            << std::string(std::min(50, terminal_width()), '-') << "\n\n";
+  return summary;
+}
+
+// The card itself, framed. Widths are measured in columns rather than bytes,
+// so the right-hand border stays put on a Japanese or accented card, which is
+// the whole reason this is worth drawing at all.
+// Columns available inside the frame, once the "│ " and " │" are taken out.
+// Capped so a very wide terminal does not stretch a three-word card across the
+// whole screen, and floored so a narrow one still has something to write in.
+std::size_t frame_inner_width() {
+  const std::size_t frame_width = static_cast<std::size_t>(
+      std::max(30, std::min(64, terminal_width() - 4)));
+  return frame_width - 4;
+}
+
+// How tall the frame will be, worked out before anything is printed so the
+// caller can centre it. Kept next to print_card because the two have to agree.
+int count_frame_lines(const std::string& summary,
+                      const std::string& prompt_line) {
+  const std::size_t inner = frame_inner_width();
+  const std::size_t lines =
+      wrap(summary, inner).size() + wrap(prompt_line, inner - 2).size();
+  // Four border and blank rows, plus the separator.
+  return static_cast<int>(lines) + 5;
+}
+
+void print_card(const std::string& summary, const std::string& prompt_line) {
+  const std::size_t inner = frame_inner_width();
+
+  std::string rule;
+  for (std::size_t i = 0; i < inner + 2; ++i) rule += "─";
+
+  auto edge = [&](const char* left, const char* right) {
+    std::cout << color::cyan << left << rule << right << "\n" << color::reset;
+  };
+  auto row = [&](const std::string& text, std::size_t indent,
+                 const char* text_color) {
+    std::cout << color::cyan << "│ " << color::reset << std::string(indent, ' ')
+              << text_color << pad_right(text, inner - indent) << color::reset
+              << color::cyan << " │\n" << color::reset;
+  };
+
+  const std::vector<std::string> summary_lines = wrap(summary, inner);
+  const std::vector<std::string> prompt_lines = wrap(prompt_line, inner - 2);
+
+  edge("┌", "┐");
+  for (const auto& line : summary_lines) row(line, 0, color::reset);
+  edge("├", "┤");
+  row("", 0, color::reset);
+  // The prompt is the one thing on screen actually worth reading, so it is
+  // indented within the frame and given the emphasis colour.
+  for (const auto& line : prompt_lines) row(line, 2, color::yellow);
+  row("", 0, color::reset);
+  edge("└", "┘");
+}
+
+// Pads the top of the screen so the card sits in the middle of the window
+// rather than hugging the top. Does nothing when the card already fills the
+// terminal, and nothing at all when output is not a screen, so piped output
+// stays free of stray blank lines.
+void centre_vertically(int content_lines) {
+  if (!interactive()) return;
+
+  // Room left below for the verdict, the new schedule and the next-action
+  // prompt. Without it the card is centred beautifully right up until it is
+  // answered, at which point the screen scrolls and pushes it off the top —
+  // so the space that the answer is about to need is reserved in advance.
+  const int room_for_the_answer = 8;
+  const int padding =
+      (terminal_height() - content_lines - room_for_the_answer) / 2;
+  for (int i = 0; i < padding; ++i) {
+    std::cout << "\n";
+  }
 }
 
 // `shown` is already the single answer to display; `others` is empty when there
@@ -259,20 +344,45 @@ void print_correct_answer(const std::string& shown, const std::string& others) {
   std::cout << "\n";
 }
 
-enum class Action { kContinue, kUndo };
+// What `?` reveals: the first character, with the shape of the rest. Spaces
+// are kept, so "la biblioteca" comes back as "l·  ··········" — enough to jog
+// the memory and to show how long the answer is, without giving it away.
+std::string hint_for(const std::string& expected) {
+  const std::string answer = primary_answer(expected);
+  std::string hint;
+  bool first = true;
+  for (std::size_t i = 0; i < answer.size();) {
+    const std::size_t bytes = utf8_char_bytes(answer, i);
+    const std::string glyph = answer.substr(i, bytes);
+    if (glyph == " ") {
+      hint += "  ";
+    } else if (first) {
+      hint += glyph;
+      first = false;
+    } else {
+      hint += "·";
+    }
+    i += bytes;
+  }
+  return hint;
+}
+
+enum class Action { kContinue, kUndo, kQuit };
 
 // Editing keeps the prompt open, so a card fixed on the spot can still have
 // its answer taken back in the same breath.
 Action prompt_next_action(Deck& deck, Flashcard& card) {
   while (true) {
     std::cout << "\n"
-              << color::yellow
-              << "[Enter] next  [e] edit this card  [u] undo this answer: "
-              << color::reset;
-    std::string input;
-    read_line(input);
-    const std::string action = to_lowercase(trim(input));
+              << legend({{"Enter", "next card"},
+                         {"e", "edit this card"},
+                         {"u", "undo this answer"},
+                         {"q", "end session"}})
+              << "\n";
+    print_prompt();
+    const std::string action = to_lowercase(read_choice());
 
+    if (action == "q") return Action::kQuit;
     if (action == "u") return Action::kUndo;
     if (action == "e") {
       edit_card_fields(card);
@@ -298,14 +408,14 @@ std::string log_event(Deck& deck, const ReviewEvent& event, bool* warned) {
 }
 
 std::string log_answer(Deck& deck, const Flashcard& card, bool reversed,
-                       bool correct, const AnswerResult& result,
+                       Outcome outcome, const AnswerResult& result,
                        bool* warned) {
   ReviewEvent event;
   event.id = generate_id();
   event.card_id = card.id;
   event.timestamp = now_timestamp();
   event.direction = reversed ? 'r' : 'n';
-  event.correct = correct;
+  event.outcome = outcome;
   event.box_before = result.old_box;
   event.box_after = result.new_box;
   return log_event(deck, event, warned);
@@ -335,25 +445,34 @@ void print_schedule(const AnswerResult& result) {
             << color::reset;
 }
 
-void print_summary(int correct, int wrong, const Deck& deck, int today_days) {
+// `skipped` is what was left on the table by ending the session early, which
+// is worth naming: leaving is a normal thing to do, and the summary should
+// still tell you where you got to rather than looking like a finished session.
+void print_summary(int correct, int wrong, int skipped, const Deck& deck,
+                   int today_days) {
   const int total = correct + wrong;
   const double percent =
       (total > 0) ? static_cast<double>(correct) * 100.0 / total : 0.0;
 
   std::cout << color::yellow
             << "==================================================\n"
-            << "                 REVIEW COMPLETE                  \n"
+            << (skipped > 0 ? "                  SESSION ENDED                   \n"
+                            : "                 REVIEW COMPLETE                  \n")
             << "==================================================\n"
             << "  Correct:        " << correct << "\n"
             << "  Incorrect:      " << wrong << "\n"
             << "  Total Reviewed: " << total << "\n"
             << "  Success Rate:   " << std::fixed << std::setprecision(2)
-            << percent << "%\n"
-            << "  Still Due:      " << deck.due_count(today_days) << "\n"
+            << percent << "%\n";
+  if (skipped > 0) {
+    std::cout << "  Not Reviewed:   " << skipped << "\n";
+  }
+  std::cout << "  Still Due:      " << deck.due_count(today_days) << "\n"
             << "==================================================\n\n"
-            << "Press Enter to return to main menu..." << color::reset;
-  std::string discard;
-  read_line(discard);
+            << color::reset
+            << legend({{"any key", "back to the main menu"}}) << "\n";
+  print_prompt();
+  read_choice();
   clear_screen();
 }
 
@@ -422,13 +541,58 @@ void review_flashcards(Deck& deck) {
   while (idx < matches.size()) {
     Flashcard& card = matches[idx].get();
     const std::string expected = expected_answer(card, session.reversed);
-    clear_screen();
-    print_header(card, idx + 1, matches.size(), today_days, session.reversed);
+    const std::string question_label =
+        session.reversed ? "Your question: " : "Your answer: ";
 
-    std::cout << color::cyan << (session.reversed ? "A: " : "Q: ")
-              << prompt_text(card, session.reversed) << color::reset << "\n\n";
-    const std::string typed =
-        prompt(session.reversed ? "Your question: " : "Your answer: ");
+    // "?" asks for a hint and "q" leaves the session. Both are unambiguous
+    // except on a card that actually accepts them as answers, and there the
+    // answer wins — asked through the real matcher rather than a string
+    // compare, so "?|question mark" is graded rather than hinted, and a vim
+    // deck can still be asked what `q` does. On such a card the key simply is
+    // not offered, and the legend says so; the session can still be ended from
+    // the prompt after the answer, which is never ambiguous.
+    const bool hint_available = !check_answer("?", expected).exact;
+    const bool quit_available = !check_answer("q", expected).exact;
+    bool hinted = false;
+    bool quit_requested = false;
+    std::string typed;
+    while (true) {
+      clear_screen();
+      const std::string summary =
+          card_summary(card, today_days, session.reversed);
+      const std::string shown = prompt_text(card, session.reversed);
+      // Two for the progress bar and its blank line, two for the prompt line
+      // and the breathing room above it.
+      centre_vertically(count_frame_lines(summary, shown) + 4);
+
+      print_progress(idx + 1, matches.size());
+      std::cout << "\n";
+      print_card(summary, shown);
+      std::cout << "\n";
+      if (hinted) {
+        std::cout << color::yellow << "Hint: " << hint_for(expected) << "\n"
+                  << color::reset;
+      }
+
+      std::vector<KeyHint> hints = {{"Enter", "submit"}};
+      if (hint_available && !hinted) hints.push_back({"?", "hint"});
+      if (quit_available) hints.push_back({"q", "end session"});
+      std::cout << legend(hints) << "\n";
+
+      typed = prompt(question_label);
+      const std::string command = to_lowercase(trim(typed));
+      if (hint_available && !hinted && command == "?") {
+        hinted = true;
+        continue;  // same card, now with the hint on screen
+      }
+      if (quit_available && command == "q") {
+        // Left unanswered on purpose: walking away from a card must not be
+        // recorded as getting it wrong.
+        quit_requested = true;
+      }
+      break;
+    }
+    if (quit_requested) break;
 
     const AnswerCheck check = check_answer(typed, expected);
     bool counted_correct = check.exact;
@@ -439,10 +603,12 @@ void review_flashcards(Deck& deck) {
         std::cout << color::yellow
                   << "\n⚠️  Close! The correct answer is: " << check.closest
                   << "\n   (You typed: " << typed << ")\n"
-                  << "Mark as correct anyway? [y/N]: " << color::reset;
-        std::string override_input;
-        read_line(override_input);
-        if (to_lowercase(trim(override_input)) == "y") {
+                  << color::reset
+                  << legend({{"y", "mark it correct"},
+                             {"any other key", "count it wrong"}})
+                  << "\n"
+                  << color::yellow << "> " << color::reset;
+        if (to_lowercase(read_choice()) == "y") {
           std::cout << color::green << "✅ Marked as correct!" << color::reset
                     << "\n";
           counted_correct = true;
@@ -457,9 +623,21 @@ void review_flashcards(Deck& deck) {
       }
     }
 
+    // Producing the answer only after being shown its first letter is a
+    // partial, not a clean recall: it holds the box rather than advancing it.
+    const Outcome outcome = !counted_correct ? Outcome::kIncorrect
+                            : hinted         ? Outcome::kPartial
+                                             : Outcome::kCorrect;
+    if (outcome == Outcome::kPartial) {
+      std::cout << color::yellow
+                << "Counted as a partial — the hint means this card stays "
+                   "where it is.\n"
+                << color::reset;
+    }
+
     const CardState before = capture_state(card);
-    const AnswerResult result = record_answer(&card, counted_correct, today_days);
-    (counted_correct ? correct_total : wrong_total)++;
+    const AnswerResult result = record_answer(&card, outcome, today_days);
+    (outcome == Outcome::kCorrect ? correct_total : wrong_total)++;
     print_schedule(result);
 
     autosave(deck);
@@ -467,20 +645,22 @@ void review_flashcards(Deck& deck) {
     // that closing the terminal at the prompt below cannot leave an answer
     // that the counters kept but the log never saw.
     const std::string answer_id =
-        log_answer(deck, card, session.reversed, counted_correct, result,
-                   &log_warned);
+        log_answer(deck, card, session.reversed, outcome, result, &log_warned);
 
-    if (prompt_next_action(deck, card) == Action::kUndo) {
+    const Action action = prompt_next_action(deck, card);
+    if (action == Action::kUndo) {
       restore_state(&card, before);
-      (counted_correct ? correct_total : wrong_total)--;
+      (outcome == Outcome::kCorrect ? correct_total : wrong_total)--;
       autosave(deck);
       log_undo(deck, card, answer_id, &log_warned);
       continue;  // same card, asked again
     }
-    ++idx;
+    ++idx;  // this card is done either way; quitting does not un-answer it
+    if (action == Action::kQuit) break;
   }
 
   clear_screen();
-  print_summary(correct_total, wrong_total, deck, today_days);
+  print_summary(correct_total, wrong_total,
+                static_cast<int>(matches.size() - idx), deck, today_days);
 }
 }  // namespace FlashTerm

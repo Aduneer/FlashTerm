@@ -11,13 +11,18 @@ bool is_due(const Flashcard& card, int today_days) {
   return card.due_date == kNoDate || card.due_date <= today_days;
 }
 
-AnswerResult record_answer(Flashcard* card, bool correct, int today_days) {
+AnswerResult record_answer(Flashcard* card, Outcome outcome, int today_days) {
   AnswerResult result;
   result.old_box = card->leitner_box;
 
-  if (correct) {
+  if (outcome == Outcome::kCorrect) {
     card->times_correct++;
     card->leitner_box = std::min(kMaxBox, card->leitner_box + 1);
+  } else if (outcome == Outcome::kPartial) {
+    // Needing the hint is not a clean recall, so it counts against the score,
+    // but the box is held rather than reset: the card is not back to square
+    // one just because it needed a nudge.
+    card->times_incorrect++;
   } else {
     card->times_incorrect++;
     card->leitner_box = 1;

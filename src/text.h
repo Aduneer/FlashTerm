@@ -24,7 +24,22 @@ std::vector<std::string> parse_csv_line(const std::string& line);
 // Column helpers measure terminal columns rather than bytes, so a card
 // containing accents or CJK still lines up in the statistics table. Wide
 // glyphs count as two columns; this needs setlocale(LC_ALL, "") at startup.
+// Bytes in the UTF-8 code point starting at `index`, so callers can walk a
+// string one character at a time instead of one byte at a time.
+std::size_t utf8_char_bytes(const std::string& str, std::size_t index);
+
 std::size_t display_width(const std::string& str);
 std::string truncate(const std::string& str, std::size_t max_width);
 std::string pad_right(const std::string& str, std::size_t width);
+
+// Breaks text into lines no wider than `width` columns, preferring spaces.
+// Measured in columns rather than bytes, so a framed card built from these
+// lines still lines up when the text is accented or CJK.
+//
+// A word longer than the whole width — a URL, or unspaced Japanese — is split
+// at the column limit rather than allowed to overflow, because a box that a
+// long word breaks out of is worse than one that hyphenlessly wraps it.
+// Returns a single empty line for empty input, so callers always have
+// something to draw.
+std::vector<std::string> wrap(const std::string& str, std::size_t width);
 }  // namespace FlashTerm

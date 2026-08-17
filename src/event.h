@@ -27,12 +27,12 @@ struct ReviewEvent {
   std::string card_id;
   std::string timestamp;  // "2026-08-17T14:23:05Z"
   char direction = 'n';   // 'n' asked normally, 'r' asked reversed
-  bool correct = false;
+  Outcome outcome = Outcome::kIncorrect;
   int box_before = 1;
   int box_after = 1;
 
   // Set only on an undo event: the id of the answer it takes back. An undo has
-  // no result of its own, so `correct` and both boxes are meaningless there.
+  // no result of its own, so `outcome` and both boxes are meaningless there.
   // Taking an answer back is recorded rather than erased, because a line that
   // may already have been synced to another machine cannot be unwritten.
   std::string undoes;
@@ -59,7 +59,8 @@ int local_day_of(const std::string& timestamp);
 
 // One event as a CSV record:
 //   id,card_id,timestamp,direction,result,box_before,box_after,undoes
-// where result is "correct", "incorrect" or "undo".
+// where result is "correct", "partial", "incorrect" or "undo". Logs written
+// before hints existed simply contain no "partial" rows.
 std::string event_to_csv(const ReviewEvent& event);
 // Returns false for records too short or too malformed to be an event; a
 // damaged line is skipped rather than taken as a review that never happened.
@@ -118,6 +119,9 @@ std::map<std::string, CardState> replay(const std::vector<ReviewEvent>& events);
 struct LogStats {
   int reviewed_today = 0;
   int correct_today = 0;
+  // Answers that needed the hint. Counted separately because "got it, but only
+  // with a nudge" is the interesting middle the plain counters cannot express.
+  int hinted_today = 0;
   // Consecutive days of reviewing, counted back from today. A day that has not
   // ended yet cannot break a streak, so an unbroken run that has not been
   // added to since yesterday still counts: the streak is only lost once a

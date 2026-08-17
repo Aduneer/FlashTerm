@@ -16,6 +16,7 @@
 #include "event.h"
 #include "review.h"
 #include "schedule.h"
+#include "terminal.h"
 #include "text.h"
 
 using namespace FlashTerm;
@@ -203,7 +204,7 @@ void test_undo_restores_card_exactly() {
 
   // A wrong answer, then undo, must leave no trace at all.
   const CardState before = capture_state(card);
-  record_answer(&card, false, now);
+  record_answer(&card, Outcome::kIncorrect, now);
   EXPECT_EQ(card.leitner_box, 1);
   EXPECT_EQ(card.times_incorrect, 2);
 
@@ -218,7 +219,7 @@ void test_undo_restores_card_exactly() {
   // dates have to go back to "never" rather than to some default.
   Flashcard fresh("Q", "A");
   const CardState fresh_before = capture_state(fresh);
-  record_answer(&fresh, true, now);
+  record_answer(&fresh, Outcome::kCorrect, now);
   EXPECT_TRUE(fresh.due_date != kNoDate);
 
   restore_state(&fresh, fresh_before);
@@ -327,7 +328,7 @@ void test_record_answer_schedules() {
   int expected_boxes[] = {2, 3, 4, 5, 5};
   bool schedule_matches = true;
   for (int step = 0; step < 5; ++step) {
-    const AnswerResult result = record_answer(&card, true, now + step);
+    const AnswerResult result = record_answer(&card, Outcome::kCorrect, now + step);
     if (card.leitner_box != expected_boxes[step]) schedule_matches = false;
     if (result.interval_days != interval_for_box(expected_boxes[step])) {
       schedule_matches = false;
@@ -347,7 +348,7 @@ void test_record_answer_schedules() {
   EXPECT_EQ(interval_for_box(0), 1);
 
   // One wrong answer drops the card to box 1 and back to a one-day interval.
-  const AnswerResult missed = record_answer(&card, false, now + 10);
+  const AnswerResult missed = record_answer(&card, Outcome::kIncorrect, now + 10);
   EXPECT_EQ(missed.old_box, 5);
   EXPECT_EQ(missed.new_box, 1);
   EXPECT_EQ(card.leitner_box, 1);
@@ -839,7 +840,7 @@ ReviewEvent answer_event(const std::string& card_id, const std::string& stamp,
   event.id = generate_id();
   event.card_id = card_id;
   event.timestamp = stamp;
-  event.correct = correct;
+  event.outcome = correct ? Outcome::kCorrect : Outcome::kIncorrect;
   event.box_before = box_before;
   event.box_after = box_after;
   return event;
@@ -892,7 +893,7 @@ void test_event_csv() {
   event.card_id = "fedcba9876543210";
   event.timestamp = "2026-08-17T14:23:05Z";
   event.direction = 'r';
-  event.correct = true;
+  event.outcome = Outcome::kCorrect;
   event.box_before = 2;
   event.box_after = 3;
 
@@ -906,7 +907,7 @@ void test_event_csv() {
   EXPECT_EQ(parsed.card_id, event.card_id);
   EXPECT_EQ(parsed.timestamp, event.timestamp);
   EXPECT_EQ(parsed.direction, 'r');
-  EXPECT_TRUE(parsed.correct);
+  EXPECT_TRUE(parsed.outcome == Outcome::kCorrect);
   EXPECT_EQ(parsed.box_before, 2);
   EXPECT_EQ(parsed.box_after, 3);
   EXPECT_TRUE(!parsed.is_undo());
@@ -942,7 +943,7 @@ void test_event_csv() {
       event_from_csv("id,card,2026-08-17T14:23:05Z,n,incorrect,0,99,", &parsed));
   EXPECT_EQ(parsed.box_before, 1);
   EXPECT_EQ(parsed.box_after, kMaxBox);
-  EXPECT_TRUE(!parsed.correct);
+  EXPECT_TRUE(parsed.outcome == Outcome::kIncorrect);
   // An unknown direction falls back to a normal prompt.
   EXPECT_EQ(parsed.direction, 'n');
 }
@@ -966,8 +967,8 @@ void test_event_log_roundtrip() {
   EXPECT_TRUE(reloaded.load());
   EXPECT_EQ(reloaded.events().size(), size_t{2});
   EXPECT_EQ(reloaded.events()[0].card_id, card);
-  EXPECT_TRUE(reloaded.events()[0].correct);
-  EXPECT_TRUE(!reloaded.events()[1].correct);
+  EXPECT_TRUE(reloaded.events()[0].outcome == Outcome::kCorrect);
+  EXPECT_TRUE(reloaded.events()[1].outcome == Outcome::kIncorrect);
 
   // Appending is additive: a second session extends the file rather than
   // replacing it, which is what makes the log mergeable at all.
@@ -1199,6 +1200,182 @@ void test_card_ids() {
   std::remove(exported.c_str());
 }
 
+void test_wrap() {
+  // Short text is one line, and empty text is still one line so a frame drawn
+  // from the result is never zero rows tall.
+  EXPECT_EQ(wrap("hello", 20).size(), size_t{1});
+  EXPECT_EQ(wrap("", 20).size(), size_t{1});
+  EXPECT_EQ(wrap("hello", 20)[0], std::string("hello"));
+
+  // Breaks at spaces, and the spaces themselves do not survive the break.
+  const std::vector<std::string> lines = wrap("the quick brown fox", 10);
+  EXPECT_EQ(lines.size(), size_t{2});
+  EXPECT_EQ(lines[0], std::string("the quick"));
+  EXPECT_EQ(lines[1], std::string("brown fox"));
+
+  // No line may exceed the width, which is the property the frame depends on.
+  bool within_width = true;
+  for (const auto& line :
+       wrap("supercalifragilistic expialidocious and some short ones", 12)) {
+    if (display_width(line) > 12) within_width = false;
+  }
+  EXPECT_TRUE(within_width);
+
+  // A single word longer than the width is broken rather than allowed to push
+  // through the border.
+  const std::vector<std::string> split_word = wrap("abcdefghij", 4);
+  EXPECT_EQ(split_word.size(), size_t{3});
+  EXPECT_EQ(split_word[0], std::string("abcd"));
+  EXPECT_EQ(split_word[2], std::string("ij"));
+
+  // Widths are columns, not bytes: CJK glyphs take two, so only three fit in
+  // a width of six however many bytes they happen to occupy.
+  const std::vector<std::string> cjk = wrap("犬猫鳥魚", 6);
+  EXPECT_EQ(cjk.size(), size_t{2});
+  EXPECT_EQ(display_width(cjk[0]), size_t{6});
+  EXPECT_EQ(cjk[0], std::string("犬猫鳥"));
+
+  // Accents are one column each, not one per byte.
+  EXPECT_EQ(wrap("el árbol", 8).size(), size_t{1});
+
+  // An explicit newline is a break the text asked for, so it is honoured.
+  EXPECT_EQ(wrap("one\ntwo", 20).size(), size_t{2});
+}
+
+void test_partial_answers() {
+  const int now = today();
+
+  // A partial holds the box: not promoted, but not knocked back to 1 either.
+  Flashcard card("Q", "A", {}, 2, 0, 3);
+  const AnswerResult partial = record_answer(&card, Outcome::kPartial, now);
+  EXPECT_EQ(partial.old_box, 3);
+  EXPECT_EQ(partial.new_box, 3);
+  EXPECT_EQ(card.leitner_box, 3);
+  // It still counts against the score, because it was not a clean recall.
+  EXPECT_EQ(card.times_incorrect, 1);
+  EXPECT_EQ(card.times_correct, 2);
+  // And it is rescheduled from today by the box it kept.
+  EXPECT_EQ(card.due_date, now + interval_for_box(3));
+  EXPECT_EQ(card.last_reviewed, now);
+
+  // Undo takes a partial back as exactly as it takes anything else back.
+  Flashcard undoable("Q", "A", {}, 1, 1, 2);
+  undoable.due_date = days_from_civil(2026, 9, 1);
+  const CardState before = capture_state(undoable);
+  record_answer(&undoable, Outcome::kPartial, now);
+  restore_state(&undoable, before);
+  EXPECT_EQ(undoable.times_incorrect, 1);
+  EXPECT_EQ(undoable.leitner_box, 2);
+  EXPECT_EQ(undoable.due_date, days_from_civil(2026, 9, 1));
+
+  // A partial on a box-1 card cannot demote below 1.
+  Flashcard weakest("Q", "A");
+  record_answer(&weakest, Outcome::kPartial, now);
+  EXPECT_EQ(weakest.leitner_box, 1);
+}
+
+void test_partial_events() {
+  ReviewEvent event;
+  event.id = "0123456789abcdef";
+  event.card_id = "fedcba9876543210";
+  event.timestamp = "2026-08-17T14:23:05Z";
+  event.outcome = Outcome::kPartial;
+  event.box_before = 3;
+  event.box_after = 3;
+
+  EXPECT_EQ(event_to_csv(event),
+            std::string("0123456789abcdef,fedcba9876543210,"
+                        "2026-08-17T14:23:05Z,n,partial,3,3,"));
+
+  ReviewEvent parsed;
+  EXPECT_TRUE(event_from_csv(event_to_csv(event), &parsed));
+  EXPECT_TRUE(parsed.outcome == Outcome::kPartial);
+
+  // A log written before hints existed has no "partial" rows, and one written
+  // by some later version with an outcome we do not know is still a review
+  // that happened, so it is read as a failed answer rather than discarded.
+  EXPECT_TRUE(event_from_csv(
+      "id,card,2026-08-17T14:23:05Z,n,something-new,1,1,", &parsed));
+  EXPECT_TRUE(parsed.outcome == Outcome::kIncorrect);
+
+  // Replay scores a partial the same way record_answer does: against the
+  // score, but carrying the box the event recorded.
+  const int day = days_from_civil(2026, 8, 17);
+  std::vector<ReviewEvent> events;
+  events.push_back(answer_event("card1", stamp_on_day(day - 1), true, 1, 2));
+  ReviewEvent hinted;
+  hinted.id = generate_id();
+  hinted.card_id = "card1";
+  hinted.timestamp = stamp_on_day(day);
+  hinted.outcome = Outcome::kPartial;
+  hinted.box_before = 2;
+  hinted.box_after = 2;
+  events.push_back(hinted);
+
+  const std::map<std::string, CardState> states = replay(events);
+  EXPECT_EQ(states.at("card1").times_correct, 1);
+  EXPECT_EQ(states.at("card1").times_incorrect, 1);
+  EXPECT_EQ(states.at("card1").leitner_box, 2);
+  EXPECT_EQ(states.at("card1").due_date, day + interval_for_box(2));
+
+  // The summary counts it as reviewed, not as correct, and separately as
+  // hinted, which is the distinction the counters alone cannot make.
+  const int today_days = today();
+  std::vector<ReviewEvent> todays;
+  todays.push_back(answer_event("card1", stamp_on_day(today_days), true, 1, 2));
+  ReviewEvent hinted_today = hinted;
+  hinted_today.id = generate_id();
+  hinted_today.timestamp = stamp_on_day(today_days);
+  todays.push_back(hinted_today);
+
+  const LogStats stats = summarize(todays, today_days);
+  EXPECT_EQ(stats.reviewed_today, 2);
+  EXPECT_EQ(stats.correct_today, 1);
+  EXPECT_EQ(stats.hinted_today, 1);
+}
+
+void test_review_keys_do_not_shadow_answers() {
+  // The answer prompt offers "?" for a hint and "q" to end the session, but
+  // only when the card does not accept them as answers. That test is the real
+  // matcher, so it holds for a card that merely lists one among its
+  // alternatives — which is what keeps a deck of regex metacharacters or vim
+  // keys reviewable rather than unanswerable.
+  EXPECT_TRUE(!check_answer("?", "library").exact);
+  EXPECT_TRUE(check_answer("?", "?").exact);
+  EXPECT_TRUE(check_answer("?", "?|question mark").exact);
+  EXPECT_TRUE(check_answer("?", "question mark|?").exact);
+
+  EXPECT_TRUE(!check_answer("q", "library").exact);
+  EXPECT_TRUE(check_answer("q", "q").exact);
+  EXPECT_TRUE(check_answer("q", "q|record macro").exact);
+  // Case and surrounding space are normalised before the comparison, so a
+  // card answered "Q" shadows the key just as surely as one answered "q".
+  EXPECT_TRUE(check_answer("q", "Q").exact);
+  EXPECT_TRUE(check_answer(" q ", "q").exact);
+
+  // And a lone "h" is still an ordinary answer, which is why nothing is bound
+  // to it: the vim keybinding deck would be unusable.
+  EXPECT_TRUE(check_answer("h", "h").exact);
+}
+
+void test_themes() {
+  // NO_COLOR wins over any theme, and detect() is safe to call repeatedly.
+  // The tests run without a tty, so colour is off and every code is empty --
+  // which is itself the property worth pinning: piped output carries no
+  // escape sequences no matter what the environment asks for.
+  color::detect();
+  EXPECT_EQ(std::string(color::red), std::string(""));
+  EXPECT_EQ(std::string(color::cyan), std::string(""));
+  EXPECT_EQ(std::string(color::reset), std::string(""));
+
+  // The names offered to the user are the ones --help advertises.
+  const std::string names = color::theme_names();
+  EXPECT_TRUE(names.find("default") != std::string::npos);
+  EXPECT_TRUE(names.find("ocean") != std::string::npos);
+  EXPECT_TRUE(names.find("sunset") != std::string::npos);
+  EXPECT_TRUE(usage_text().find("FLASHTERM_THEME") != std::string::npos);
+}
+
 void test_deck_carries_its_log() {
   const std::string path = temp_path("logged.txt");
   const std::string log = log_path_for(path);
@@ -1272,6 +1449,11 @@ int main() {
   test_replay();
   test_summarize();
   test_card_ids();
+  test_wrap();
+  test_partial_answers();
+  test_partial_events();
+  test_review_keys_do_not_shadow_answers();
+  test_themes();
   test_deck_carries_its_log();
 
   std::cout << "\n" << (g_checks - g_failures) << "/" << g_checks

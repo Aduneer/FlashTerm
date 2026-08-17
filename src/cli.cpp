@@ -26,9 +26,21 @@ The deck is created if it does not exist, and saved after every answer and
 edit, so interrupting a session costs nothing. Import a starter deck from
 examples/ with menu option 5.
 
+Every answer is also appended to a review log beside the deck, named after it
+with ".log" added, which is where the streak and review-count statistics on the
+progress screen come from.
+
 Environment:
-  NO_COLOR    Set to any value to disable coloured output.
+  FLASHTERM_DECK  Deck to study when none is named on the command line. Handy
+                  when the deck lives in a synced directory. A deck given as an
+                  argument still wins.
+  NO_COLOR        Set to any value to disable coloured output.
 )";
+}
+
+std::string deck_from_env(const char* env_value, const std::string& fallback) {
+  if (env_value == nullptr || *env_value == '\0') return fallback;
+  return env_value;
 }
 
 CliOptions parse_args(int argc, const char* const argv[],

@@ -756,6 +756,50 @@ void test_cli_parsing() {
   // Errors and help both carry text worth printing.
   EXPECT_TRUE(!parse({"--nope"}).error.empty());
   EXPECT_TRUE(usage_text().find("--version") != std::string::npos);
+  EXPECT_TRUE(usage_text().find("FLASHTERM_DECK") != std::string::npos);
+}
+
+CliOptions parse_with_default(std::vector<const char*> args,
+                              const std::string& default_deck) {
+  args.insert(args.begin(), "FlashTerm");
+  return parse_args(static_cast<int>(args.size()), args.data(), default_deck);
+}
+
+void test_deck_from_env() {
+  const std::string fallback = "flashcards.txt";
+
+  // Unset and empty both mean "no preference", so an exported-but-blank
+  // variable does not send the user to a deck named "".
+  EXPECT_EQ(deck_from_env(nullptr, fallback), fallback);
+  EXPECT_EQ(deck_from_env("", fallback), fallback);
+
+  // Otherwise the value is used exactly as given: paths are allowed to contain
+  // spaces, and trimming them would make some real files unreachable.
+  EXPECT_EQ(deck_from_env("/sync/spanish.txt", fallback),
+            std::string("/sync/spanish.txt"));
+  EXPECT_EQ(deck_from_env("~/Dropbox/my deck.txt", fallback),
+            std::string("~/Dropbox/my deck.txt"));
+  EXPECT_EQ(deck_from_env(" ", fallback), std::string(" "));
+
+  // A deck named on the command line outranks the environment, which is what
+  // makes the variable a default rather than an override.
+  const std::string env_deck = deck_from_env("/sync/spanish.txt", fallback);
+  EXPECT_EQ(parse_with_default({"other.txt"}, env_deck).deck_path,
+            std::string("other.txt"));
+
+  // With no argument, the environment's deck is the one that gets studied.
+  const CliOptions defaulted = parse_with_default({}, env_deck);
+  EXPECT_TRUE(defaulted.action == CliAction::RunDeck);
+  EXPECT_EQ(defaulted.deck_path, std::string("/sync/spanish.txt"));
+
+  // Options still behave: the variable does not turn --help into a deck.
+  EXPECT_TRUE(parse_with_default({"--help"}, env_deck).action ==
+              CliAction::ShowHelp);
+
+  // The log follows the deck wherever it is pointed, so a synced deck syncs
+  // its history alongside it without any extra configuration.
+  EXPECT_EQ(log_path_for(defaulted.deck_path),
+            std::string("/sync/spanish.txt.log"));
 }
 
 // --- Review log ---
@@ -1215,6 +1259,7 @@ int main() {
   test_stats();
   test_remove();
   test_cli_parsing();
+  test_deck_from_env();
   test_find();
   test_reverse_prompting();
   test_event_ids();

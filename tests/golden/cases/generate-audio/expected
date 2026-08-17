@@ -1,0 +1,18 @@
+--- output ---
+Rendering audio for 2 cards in deck.txt
+  rendered  audio/<ID1>.wav  Bonjour
+  rendered  audio/<ID2>.wav  Merci
+
+2 rendered, 0 skipped, 0 failed
+--- exit status ---
+0
+--- file audio/<ID1>.wav ---
+Bonjour
+--- file audio/<ID2>.wav ---
+Merci
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>,audio/<ID1>.wav
+Merci,Thanks,french,0,0,1,,,<ID2>,audio/<ID2>.wav
+--- file played.txt ---
+render: audio/<ID1>.wav
+render: audio/<ID2>.wav

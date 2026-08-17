@@ -1,5 +1,5 @@
 --- output ---
-FlashTerm: unknown option: --nope
+FlashTerm: --force only applies to --generate-audio
 
 FlashTerm - spaced-repetition flashcards in your terminal.
 

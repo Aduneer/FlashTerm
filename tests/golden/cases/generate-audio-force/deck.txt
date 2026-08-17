@@ -1,0 +1,1 @@
+Bonjour,Hello,french,0,0,1,,,aaaaaaaaaaaaaaaa,audio/bonjour.wav

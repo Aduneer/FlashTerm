@@ -77,13 +77,13 @@ bool card_from_csv(const std::string& line, Flashcard* out) {
 Deck::Deck(std::string path)
     : path_(std::move(path)), log_(log_path_for(path_)) {}
 
-std::string Deck::audio_path(const Flashcard& card) const {
-  if (card.audio.empty() || card.audio[0] == '/') return card.audio;
+std::string Deck::resolve(const std::string& relative) const {
+  if (relative.empty() || relative[0] == '/') return relative;
   const std::size_t slash = path_.find_last_of('/');
   // A bare deck name means the deck is in the working directory, and so is
   // anything relative to it.
-  if (slash == std::string::npos) return card.audio;
-  return path_.substr(0, slash + 1) + card.audio;
+  if (slash == std::string::npos) return relative;
+  return path_.substr(0, slash + 1) + relative;
 }
 
 bool Deck::load() {

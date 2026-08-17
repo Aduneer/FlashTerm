@@ -495,6 +495,13 @@ void test_audio_path_resolution() {
   // No recording resolves to no path, rather than to the deck's directory.
   Flashcard silent("Q", "A");
   EXPECT_EQ(nested.audio_path(silent), std::string(""));
+
+  // The same rule is what --generate-audio uses to place the audio directory,
+  // so it is reachable without a card.
+  EXPECT_EQ(nested.resolve("audio"),
+            std::string("/home/someone/decks/audio"));
+  EXPECT_EQ(bare.resolve("audio"), std::string("audio"));
+  EXPECT_EQ(nested.resolve(""), std::string(""));
 }
 
 void test_save_load_roundtrip() {
@@ -811,6 +818,28 @@ void test_cli_parsing() {
   // One deck at a time, and no empty paths.
   EXPECT_TRUE(parse({"a.txt", "b.txt"}).action == CliAction::Error);
   EXPECT_TRUE(parse({""}).action == CliAction::Error);
+
+  // --generate-audio is about a deck, so unlike --help it does not swallow the
+  // rest of the command line.
+  EXPECT_TRUE(parse({"--generate-audio"}).action == CliAction::GenerateAudio);
+  EXPECT_EQ(parse({"--generate-audio"}).deck_path, std::string("default.txt"));
+  EXPECT_EQ(parse({"--generate-audio", "fr.txt"}).deck_path,
+            std::string("fr.txt"));
+  EXPECT_EQ(parse({"fr.txt", "--generate-audio"}).deck_path,
+            std::string("fr.txt"));
+  EXPECT_TRUE(!parse({"--generate-audio", "fr.txt"}).force);
+  EXPECT_TRUE(parse({"--generate-audio", "--force", "fr.txt"}).force);
+  EXPECT_TRUE(parse({"fr.txt", "--force", "--generate-audio"}).force);
+
+  // --force alone would silently do nothing, and the obvious misreading is
+  // that it forces something about a review.
+  EXPECT_TRUE(parse({"--force"}).action == CliAction::Error);
+  EXPECT_TRUE(parse({"fr.txt", "--force"}).action == CliAction::Error);
+
+  // Still an option, not a deck name, after "--".
+  EXPECT_TRUE(parse({"--", "--generate-audio"}).action == CliAction::RunDeck);
+  EXPECT_EQ(parse({"--", "--generate-audio"}).deck_path,
+            std::string("--generate-audio"));
 
   // Errors and help both carry text worth printing.
   EXPECT_TRUE(!parse({"--nope"}).error.empty());

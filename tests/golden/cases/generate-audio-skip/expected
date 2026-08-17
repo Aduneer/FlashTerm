@@ -1,0 +1,11 @@
+--- output ---
+Rendering audio for 1 card in deck.txt
+  skipped   audio/bonjour.wav  (exists)
+
+0 rendered, 1 skipped, 0 failed
+--- exit status ---
+0
+--- file audio/bonjour.wav ---
+Bonjour
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>,audio/bonjour.wav

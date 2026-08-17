@@ -47,10 +47,19 @@ fi
 
 # Everything the run left behind, in a stable order, so a case that writes an
 # export or a log covers it without having to say so.
+#
+# Sorted by the real filename, before normalisation, which matters for a case
+# whose files are named after card ids: those are random, so two of them sort
+# differently from one run to the next and the transcript shuffles. Such a case
+# has to give its cards fixed ids in its deck fixture. See cases/generate-audio.
 emit_files() {
   find . -type f | LC_ALL=C sort | while read -r file; do
     printf -- '--- file %s ---\n' "${file#./}"
     cat "$file"
+    # A file that does not end in a newline would otherwise run into the next
+    # header and hide its own last line inside it. Command substitution strips
+    # trailing newlines, so a non-empty result means the last byte was not one.
+    if [ -n "$(tail -c 1 "$file")" ]; then echo; fi
   done
 }
 
@@ -106,6 +115,7 @@ run_case() {
     env -u FLASHTERM_DECK -u FLASHTERM_THEME TZ=UTC NO_COLOR=1 FLASHTERM_SEED=1 \
       FLASHTERM_TTS="$script_dir/fake-audio.sh speak" \
       FLASHTERM_PLAYER="$script_dir/fake-audio.sh play" \
+      FLASHTERM_TTS_RENDER="$script_dir/fake-audio.sh render {out}" \
       $case_env \
       "$bin" $args <"$case_dir/input" >"$captured" 2>&1
   ) && status=0 || status=$?

@@ -22,6 +22,13 @@ Usage:
   FlashTerm --help        Show this help and exit.
   FlashTerm --version     Show the version and exit.
 
+  FlashTerm [deck] --generate-audio [--force]
+                          Render a sound file for every card's question into an
+                          audio/ directory beside the deck, and record each one
+                          in the deck's audio column. Cards that already have a
+                          recording are skipped unless --force is given. Needs
+                          FLASHTERM_TTS_RENDER; see below.
+
 The deck is created if it does not exist, and saved after every answer and
 edit, so interrupting a session costs nothing. Import a starter deck from
 examples/ with menu option 5.
@@ -40,6 +47,13 @@ Environment:
   FLASHTERM_THEME  Colour palette: default, ocean or sunset.
   NO_COLOR         Set to any value to disable coloured output, whatever the
                    theme says.
+  FLASHTERM_TTS_RENDER
+                   Command that --generate-audio uses to write a sound file:
+                   "{out}" is replaced with the path to write and the text
+                   arrives on standard input. No default, because a voice
+                   implies a language. For example:
+                     piper -m fr_FR-siwis-medium -f {out}
+                     espeak-ng -v fr --stdin -w {out}
   FLASHTERM_TTS    Command that speaks the text given as its last argument, for
                    cards with no recording of their own. Defaults to whichever
                    of espeak-ng, espeak, say or flite is installed. Add
@@ -81,6 +95,16 @@ CliOptions parse_args(int argc, const char* const argv[],
         options.action = CliAction::ShowVersion;
         return options;
       }
+      // Unlike --help and --version these do not return immediately: both are
+      // about a deck, so the rest of the command line still has to be read.
+      if (arg == "--generate-audio") {
+        options.action = CliAction::GenerateAudio;
+        continue;
+      }
+      if (arg == "--force") {
+        options.force = true;
+        continue;
+      }
       // A bare "-" is not a deck name either, and silently creating a file
       // called "-x" is worse than refusing to start.
       if (arg.size() > 1 && arg[0] == '-') {
@@ -101,6 +125,11 @@ CliOptions parse_args(int argc, const char* const argv[],
     have_deck = true;
   }
 
+  // --force on its own would silently do nothing, which is worse than saying
+  // so: the likely reading is that it forces something about a review.
+  if (options.force && options.action != CliAction::GenerateAudio) {
+    return error("--force only applies to --generate-audio");
+  }
   if (!have_deck) options.deck_path = default_deck;
   return options;
 }

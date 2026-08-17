@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <csignal>
 #include <cstdlib>
 #include <sstream>
 #include <vector>
@@ -134,6 +135,96 @@ bool run(const Command& command, const std::string& final_argument) {
   }
   return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
+
+// Same as run(), but the text goes to the child on standard input and the
+// arguments are used as given rather than having one appended. Rendering needs
+// both: where to write is an argument, what to say is not.
+bool run_with_input(const Command& command, const std::string& input) {
+  if (command.empty()) return false;
+
+  int pipe_fds[2];
+  if (pipe(pipe_fds) != 0) return false;
+
+  std::vector<char*> argv;
+  argv.reserve(command.size() + 1);
+  for (const std::string& word : command) {
+    argv.push_back(const_cast<char*>(word.c_str()));
+  }
+  argv.push_back(nullptr);
+
+  const pid_t pid = fork();
+  if (pid < 0) {
+    close(pipe_fds[0]);
+    close(pipe_fds[1]);
+    return false;
+  }
+  if (pid == 0) {
+    close(pipe_fds[1]);
+    dup2(pipe_fds[0], STDIN_FILENO);
+    close(pipe_fds[0]);
+    // Rendering is a batch operation with its own progress output, so the
+    // synthesiser's chatter is suppressed the same way playback's is.
+    const int null = open("/dev/null", O_WRONLY);
+    if (null >= 0) {
+      dup2(null, STDOUT_FILENO);
+      dup2(null, STDERR_FILENO);
+      if (null > STDERR_FILENO) close(null);
+    }
+    execvp(argv[0], argv.data());
+    _exit(127);
+  }
+
+  close(pipe_fds[0]);
+  // A child that exits before reading turns the write below into SIGPIPE,
+  // which would kill a batch run partway through for what is only a failed
+  // card. Ignored here and restored after, so the failure arrives as a return
+  // value like every other.
+  void (*previous)(int) = signal(SIGPIPE, SIG_IGN);
+  std::size_t written = 0;
+  while (written < input.size()) {
+    const ssize_t chunk =
+        write(pipe_fds[1], input.data() + written, input.size() - written);
+    if (chunk < 0) {
+      if (errno == EINTR) continue;
+      break;
+    }
+    written += static_cast<std::size_t>(chunk);
+  }
+  close(pipe_fds[1]);
+  signal(SIGPIPE, previous);
+
+  int status = 0;
+  while (waitpid(pid, &status, 0) < 0) {
+    if (errno != EINTR) return false;
+  }
+  return WIFEXITED(status) && WEXITSTATUS(status) == 0 &&
+         written == input.size();
+}
+
+// "{out}" is replaced wherever it appears, so the placeholder can sit inside a
+// larger argument ("--output={out}") as well as be one on its own.
+Command substitute(const Command& command, const std::string& output_path) {
+  Command result;
+  result.reserve(command.size());
+  for (std::string word : command) {
+    const std::string token = "{out}";
+    for (std::size_t at = word.find(token); at != std::string::npos;
+         at = word.find(token, at + output_path.size())) {
+      word.replace(at, token.size(), output_path);
+    }
+    result.push_back(word);
+  }
+  return result;
+}
+
+// No built-in fallback, unlike speaking aloud: piper cannot run without being
+// told which voice to use, and picking one would render a French deck in
+// whatever language the default happened to be.
+Command renderer() {
+  Command command = command_from_environment("FLASHTERM_TTS_RENDER");
+  if (command.empty() || find_in_path(command[0]).empty()) return {};
+  return command;
+}
 }  // namespace
 
 bool available() { return !speaker().empty() || !player().empty(); }
@@ -146,6 +237,17 @@ std::string speaker_name() {
 std::string player_name() {
   const Command command = player();
   return command.empty() ? std::string() : command[0];
+}
+
+std::string renderer_name() {
+  const Command command = renderer();
+  return command.empty() ? std::string() : command[0];
+}
+
+bool render(const std::string& text, const std::string& output_path) {
+  const Command command = renderer();
+  if (command.empty() || text.empty()) return false;
+  return run_with_input(substitute(command, output_path), text);
 }
 
 bool play(const std::string& file, const std::string& text) {

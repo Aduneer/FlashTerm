@@ -16,16 +16,14 @@ render a French deck in English.
 
 Installed voices:
 
-  de_DE-thorsten-medium
-  en_GB-alba-medium
-  es_ES-davefx-medium
   fr_FR-siwis-medium
-  ja_JA-hi_fi_captain-medium
 
 Use one with:
 
-  FlashTerm deck.txt --generate-audio --voice de_DE-thorsten-medium
+  FlashTerm deck.txt --generate-audio --voice fr_FR-siwis-medium
 --- exit status ---
 1
 --- file deck.txt ---
 Bonjour,Hello,french
+--- file voices/fr_FR-siwis-medium.onnx ---
+model bytes

@@ -108,15 +108,25 @@ run_case() {
   # and only a fixed zone makes the two agree on which day it is.
   # FLASHTERM_SEED pins the review shuffle, which is what lets a case use more
   # than one card: the input script has to know which card it is answering.
-  # The audio commands are pinned to a stub for the same kind of reason: which
-  # keys review offers depends on what the machine can play, and a transcript
-  # recorded on a developer's laptop would then not match one recorded on CI,
-  # which has neither a synthesiser nor a player. The case env comes last so a
-  # case can override any of it.
+  #
+  # Everything else here pins what the app is allowed to notice about the
+  # machine it is running on, because all of it reaches the output. Which keys
+  # review offers depends on what can play sound; what --generate-audio says
+  # depends on which piper voices are installed, and it will happily read the
+  # developer's own home directory to find out. So the audio commands go to a
+  # stub, PATH starts at a stub piper, and HOME and the voice directory point
+  # inside the case's own working directory -- where a case can put voices/ if
+  # it wants any to be found, and where there are none otherwise.
+  #
+  # Pinned here rather than per case on purpose: a case that forgets passes on
+  # a laptop and fails on CI, which is precisely what happened before this was
+  # a default. The case env comes last, so a case can still override any of it.
   (
     cd "$work_dir"
     # shellcheck disable=SC2086
     env -u FLASHTERM_DECK -u FLASHTERM_THEME TZ=UTC NO_COLOR=1 FLASHTERM_SEED=1 \
+      HOME=. FLASHTERM_VOICES=voices \
+      PATH="$script_dir/fakebin:/usr/bin:/bin" \
       FLASHTERM_TTS="$script_dir/fake-audio.sh speak" \
       FLASHTERM_PLAYER="$script_dir/fake-audio.sh play" \
       FLASHTERM_TTS_RENDER="$script_dir/fake-audio.sh render {out}" \

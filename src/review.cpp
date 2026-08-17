@@ -1,6 +1,8 @@
 #include "review.h"
 
 #include <algorithm>
+#include <cerrno>
+#include <cstdlib>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -57,8 +59,31 @@ struct SessionTally {
   }
 };
 
+// FLASHTERM_SEED fixes the order cards come out in, so that the same scripted
+// session produces the same session twice. It exists for tests/golden, which
+// otherwise cannot review more than one card at a time -- and reviewing one
+// card is exactly the case where ordering has no bugs to find.
+//
+// An unset or unreadable value keeps the nondeterministic seed, so no real run
+// is affected, and a typo in a shell profile silently reverts to shuffling
+// rather than quietly pinning every session to the same order.
+std::mt19937::result_type chosen_seed() {
+  const char* requested = std::getenv("FLASHTERM_SEED");
+  if (requested != nullptr) {
+    // errno rather than the return value: strtoul reports both "not a number"
+    // and "too large" through it, and either one means fall back.
+    errno = 0;
+    char* end = nullptr;
+    const unsigned long value = std::strtoul(requested, &end, 10);
+    if (errno == 0 && end != requested && *end == '\0') {
+      return static_cast<std::mt19937::result_type>(value);
+    }
+  }
+  return std::random_device{}();
+}
+
 std::mt19937& rng() {
-  static std::mt19937 generator(std::random_device{}());
+  static std::mt19937 generator(chosen_seed());
   return generator;
 }
 

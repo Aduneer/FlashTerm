@@ -1,0 +1,136 @@
+--- output ---
+Loaded 4 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (4 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Review ---
+[1] Due now  (4 cards)
+[2] All cards
+[3] By tag
+[4] Difficult only  (incorrect > correct)
+[5] By Leitner box, weakest first
+[q] Back to the main menu
+> 
+--- Select a Box ---
+[1] Box 1  (2 cards, reviewed every 1 day)
+[2] Box 2  (1 card, reviewed every 3 days)
+[3] Box 3  (1 card, reviewed every 7 days)
+[4] Box 4  (0 cards, reviewed every 14 days)
+[5] Box 5  (0 cards, reviewed every 30 days)
+[0] All boxes, weakest first
+> 
+--- Prompt Direction ---
+[Enter] Normal — question shown, you type the answer
+[r] Reversed — answer shown, you type the question
+> Progress: [█████░░░░░░░░░░░░░░░] 25% (1/4 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french                                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Merci                                                      │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+❌ Incorrect! Correct answer: Thanks
+Next review in 1 day (<DATE1>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> Progress: [██████████░░░░░░░░░░] 50% (2/4 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french;animal                                  │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Chien                                                      │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+❌ Incorrect! Correct answer: Dog
+Next review in 1 day (<DATE1>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> Progress: [███████████████░░░░░] 75% (3/4 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 2 · new · french;animal                                  │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Chat                                                       │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+❌ Incorrect! Correct answer: Cat
+Card demoted back to Box 1!
+Next review in 1 day (<DATE1>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> Progress: [████████████████████] 100% (4/4 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 3 · new · french                                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Bonjour                                                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+❌ Incorrect! Correct answer: Hello
+Card demoted back to Box 1!
+Next review in 1 day (<DATE1>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> ==================================================
+                 REVIEW COMPLETE                  
+==================================================
+  Correct:        0
+  Incorrect:      4
+  Total Reviewed: 4
+  Success Rate:   0.00%
+  Still Due:      0
+==================================================
+
+[any key] back to the main menu
+> 
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+Input stream closed/EOF. Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Bonjour,Hello,french,4,1,1,<DATE2>,<DATE1>,<ID1>
+Merci,Thanks,french,0,3,1,<DATE2>,<DATE1>,<ID2>
+Chat,Cat,french;animal,2,2,1,<DATE2>,<DATE1>,<ID3>
+Chien,Dog,french;animal,0,1,1,<DATE2>,<DATE1>,<ID4>
+--- file deck.txt.log ---
+<ID5>,<ID2>,<TIME>,n,incorrect,1,1,
+<ID6>,<ID4>,<TIME>,n,incorrect,1,1,
+<ID7>,<ID3>,<TIME>,n,incorrect,2,1,
+<ID8>,<ID1>,<TIME>,n,incorrect,3,1,

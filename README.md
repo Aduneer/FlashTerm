@@ -292,6 +292,13 @@ still recording which id is which. Timestamps become a plain `<TIME>`, because
 whether two events land in the same second depends only on how fast the machine
 ran.
 
+The other source of run-to-run difference is the review shuffle, and
+`FLASHTERM_SEED` settles it: set to a number, it fixes the order cards are asked
+in, which is what lets a case script answers for a deck of more than one card.
+The harness sets it, so a case need not. Leave it unset — as every real run
+does — and the shuffle stays random; an unparseable value falls back to random
+too, so a typo in a shell profile cannot quietly pin every session to one order.
+
 These tests work because every input path falls back to reading whole lines
 when stdin is not a terminal, and colour, screen clearing and vertical centring
 all switch off when stdout is not a terminal. Keep it that way: a golden test

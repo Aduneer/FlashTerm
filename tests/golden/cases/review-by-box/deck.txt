@@ -1,0 +1,4 @@
+Bonjour,Hello,french,4,0,3,,
+Merci,Thanks,french,0,2,1,,
+Chat,Cat,french;animal,2,1,2,,
+Chien,Dog,french;animal,0,0,1,,

@@ -75,10 +75,12 @@ run_case() {
   # developer's shell would otherwise send every case at their real deck.
   # TZ is pinned because scheduling is in local days while the log is in UTC,
   # and only a fixed zone makes the two agree on which day it is.
+  # FLASHTERM_SEED pins the review shuffle, which is what lets a case use more
+  # than one card: the input script has to know which card it is answering.
   (
     cd "$work_dir"
     # shellcheck disable=SC2086
-    env -u FLASHTERM_DECK -u FLASHTERM_THEME TZ=UTC NO_COLOR=1 \
+    env -u FLASHTERM_DECK -u FLASHTERM_THEME TZ=UTC NO_COLOR=1 FLASHTERM_SEED=1 \
       "$bin" $args <"$case_dir/input" >"$captured" 2>&1
   ) && status=0 || status=$?
 

@@ -130,7 +130,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Rendering audio for "
               << count_label(static_cast<int>(deck.size()), "card", "cards")
               << " in " << deck.path() << "\n";
-    return generate_audio(deck, options.force, std::cout, std::cerr)
+    return generate_audio(deck, options.voice, options.force, std::cout,
+                          std::cerr)
         .exit_code();
   }
 

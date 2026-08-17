@@ -1,0 +1,15 @@
+--- output ---
+Rendering audio for 1 card in deck.txt
+FlashTerm: no piper voice called "fr_FR-siwis-medium".
+
+Piper is not installed. It is a neural text-to-speech engine that runs
+offline, and it is what makes a language deck sound like a person:
+
+  pipx install piper-tts
+
+Then download a voice and try again. Run --generate-audio once more
+afterwards and it will print the exact download command for you.
+--- exit status ---
+1
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>

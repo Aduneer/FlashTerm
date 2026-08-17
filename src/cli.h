@@ -24,6 +24,10 @@ struct CliOptions {
   // --force, which only means anything alongside --generate-audio: re-render
   // cards that already have a recording, so a deck can pick up a better voice.
   bool force = false;
+
+  // --voice, likewise: the name of a piper voice to render with, such as
+  // "fr_FR-siwis-medium". Empty means none was given.
+  std::string voice;
 };
 
 // Parses argv, treating a leading-dash argument as an option rather than a deck

@@ -22,12 +22,17 @@ Usage:
   FlashTerm --help        Show this help and exit.
   FlashTerm --version     Show the version and exit.
 
-  FlashTerm [deck] --generate-audio [--force]
+  FlashTerm [deck] --generate-audio --voice <name> [--force]
                           Render a sound file for every card's question into an
                           audio/ directory beside the deck, and record each one
-                          in the deck's audio column. Cards that already have a
-                          recording are skipped unless --force is given. Needs
-                          FLASHTERM_TTS_RENDER; see below.
+                          in the deck's audio column, so that reviewing plays a
+                          real voice instead of a robotic one. Cards that
+                          already have a recording are skipped unless --force
+                          is given.
+
+                          <name> is a piper voice, such as fr_FR-siwis-medium.
+                          Run it without --voice to be shown which ones are
+                          installed and how to get more.
 
 The deck is created if it does not exist, and saved after every answer and
 edit, so interrupting a session costs nothing. Import a starter deck from
@@ -47,12 +52,12 @@ Environment:
   FLASHTERM_THEME  Colour palette: default, ocean or sunset.
   NO_COLOR         Set to any value to disable coloured output, whatever the
                    theme says.
+  FLASHTERM_VOICES Extra directories to search for piper voices, separated by
+                   colons like PATH. The usual places are searched anyway.
   FLASHTERM_TTS_RENDER
-                   Command that --generate-audio uses to write a sound file:
-                   "{out}" is replaced with the path to write and the text
-                   arrives on standard input. No default, because a voice
-                   implies a language. For example:
-                     piper -m fr_FR-siwis-medium -f {out}
+                   A synthesiser other than piper for --generate-audio, which
+                   it then uses instead of --voice: "{out}" is replaced with
+                   the path to write and the text arrives on standard input.
                      espeak-ng -v fr --stdin -w {out}
   FLASHTERM_TTS    Command that speaks the text given as its last argument, for
                    cards with no recording of their own. Defaults to whichever
@@ -105,6 +110,20 @@ CliOptions parse_args(int argc, const char* const argv[],
         options.force = true;
         continue;
       }
+      // Accepts both spellings, because a user who has just been shown
+      // `--voice fr_FR-siwis-medium` will type it either way.
+      if (arg == "--voice") {
+        if (i + 1 >= argc) return error("--voice needs the name of a voice");
+        options.voice = argv[++i];
+        continue;
+      }
+      if (arg.rfind("--voice=", 0) == 0) {
+        options.voice = arg.substr(std::string("--voice=").size());
+        if (options.voice.empty()) {
+          return error("--voice needs the name of a voice");
+        }
+        continue;
+      }
       // A bare "-" is not a deck name either, and silently creating a file
       // called "-x" is worse than refusing to start.
       if (arg.size() > 1 && arg[0] == '-') {
@@ -125,10 +144,14 @@ CliOptions parse_args(int argc, const char* const argv[],
     have_deck = true;
   }
 
-  // --force on its own would silently do nothing, which is worse than saying
-  // so: the likely reading is that it forces something about a review.
-  if (options.force && options.action != CliAction::GenerateAudio) {
-    return error("--force only applies to --generate-audio");
+  // Either on its own would silently do nothing, which is worse than saying so:
+  // the likely reading of --force is that it forces something about a review,
+  // and of --voice that it changes the voice used when reviewing.
+  if (options.action != CliAction::GenerateAudio) {
+    if (options.force) return error("--force only applies to --generate-audio");
+    if (!options.voice.empty()) {
+      return error("--voice only applies to --generate-audio");
+    }
   }
   if (!have_deck) options.deck_path = default_deck;
   return options;

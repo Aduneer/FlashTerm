@@ -1,0 +1,6 @@
+#!/bin/sh
+# Only ever has to exist and be executable: FlashTerm looks for a Python beside
+# the resolved piper binary so it can print a download command that actually
+# works under pipx. It is never run by the tests, only named.
+echo "fake python3 for tests" >&2
+exit 1

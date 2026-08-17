@@ -233,11 +233,26 @@ was, and want to know how it sounds.
 ### Generating recordings
 
 Speaking a card live is instant but robotic. Better voices are too slow to run
-mid-review — around a second a card — so they are rendered once, ahead of time:
+mid-review — around a second a card — so they are rendered once, ahead of time.
+
+Start here, and let FlashTerm tell you the rest:
 
 ```bash
-export FLASHTERM_TTS_RENDER="piper -m fr_FR-siwis-medium -f {out}"
 FlashTerm french.txt --generate-audio
+```
+
+With nothing set up, that prints what to install; once piper is installed it
+prints the exact download command for a voice, including the right interpreter
+— pipx hides piper's Python inside its own virtual environment, and the obvious
+`python3 -m piper.download_voices` fails with a bare `ModuleNotFoundError`. Once
+a voice is downloaded, it lists what you have. The whole path from nothing to
+audio is three commands, and you are told each one at the point you need it.
+
+```bash
+pipx install piper-tts                            # it will tell you this
+~/.local/share/pipx/venvs/piper-tts/bin/python3 \
+  -m piper.download_voices fr_FR-siwis-medium     # and this, worked out for you
+FlashTerm french.txt --generate-audio --voice fr_FR-siwis-medium
 ```
 
 ```
@@ -259,30 +274,31 @@ Files are named after the card's id rather than its question, because an id is
 already unique and already ASCII — `¿Dónde está la estación?` is a filename only
 on a generous filesystem. The deck's audio column is what maps one to the other.
 
-`FLASHTERM_TTS_RENDER` names the synthesiser: `{out}` is replaced with the file
-to write, and the text arrives on standard input. That one convention fits both
-candidates, and anything else that can read stdin and write a file:
+`--voice` takes a piper voice name. Voices are looked for in
+`~/.local/share/piper-voices`, `~/.local/share/piper/voices` and `~/.cache/piper`
+— set `FLASHTERM_VOICES` (colon-separated, like `PATH`) to add more, or pass a
+path to a `.onnx` file directly. There is deliberately no default voice: a voice
+implies a language, and guessing would render a French deck in English without
+saying so.
+
+To use something other than piper, `FLASHTERM_TTS_RENDER` takes any command at
+all and wins over `--voice` when set. `{out}` is replaced with the file to write
+and the text arrives on standard input — the one convention every candidate
+already has, whatever it calls its output flag:
 
 ```bash
-FLASHTERM_TTS_RENDER="piper -m fr_FR-siwis-medium -f {out}"
 FLASHTERM_TTS_RENDER="espeak-ng -v fr --stdin -w {out}"
 ```
 
-There is deliberately no default. A voice implies a language, and guessing one
-would render a French deck in English without saying so.
-
-#### Getting piper
-
-```bash
-pipx install piper-tts
-python3 -m piper.download_voices fr_FR-siwis-medium
-```
+#### About piper
 
 [Piper](https://github.com/OHF-voice/piper1-gpl) is a neural text-to-speech
 system from the Home Assistant authors. It runs offline, needs no GPU, and its
 voices are dramatically better than `espeak-ng` for language learning — which is
 the whole point of hearing a card. Voices are about 60 MB each and cover 30-odd
-languages; browse them with `python3 -m piper.download_voices --help`.
+languages; list them all with
+`python3 -m piper.download_voices --help` (using the interpreter FlashTerm
+printed for you).
 
 FlashTerm does not bundle, link against, or require piper. It runs whatever
 command you put in `FLASHTERM_TTS_RENDER` as a separate process, so piper's
@@ -446,6 +462,7 @@ cannot drive an app that insists on a tty.
 | `src/terminal.*` | Colour detection, screen clearing, terminal width |
 | `src/audio.*` | Finding a player or synthesiser on the PATH, and running it |
 | `src/generate.*` | `--generate-audio`: rendering a deck's recordings in bulk |
+| `src/voice.*` | Finding piper voices on disk, and explaining how to get one |
 | `src/event.*` | The append-only review log: events, ids, timestamps, merge and replay |
 | `src/deck.*` | The `Deck` class: load, atomic save, import/export, tags, statistics |
 | `src/review.*` | Review session flow and the Leitner promotion rules |

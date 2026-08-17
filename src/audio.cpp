@@ -217,14 +217,6 @@ Command substitute(const Command& command, const std::string& output_path) {
   return result;
 }
 
-// No built-in fallback, unlike speaking aloud: piper cannot run without being
-// told which voice to use, and picking one would render a French deck in
-// whatever language the default happened to be.
-Command renderer() {
-  Command command = command_from_environment("FLASHTERM_TTS_RENDER");
-  if (command.empty() || find_in_path(command[0]).empty()) return {};
-  return command;
-}
 }  // namespace
 
 bool available() { return !speaker().empty() || !player().empty(); }
@@ -239,13 +231,17 @@ std::string player_name() {
   return command.empty() ? std::string() : command[0];
 }
 
-std::string renderer_name() {
-  const Command command = renderer();
-  return command.empty() ? std::string() : command[0];
+Command render_command_from_environment() {
+  const Command command = command_from_environment("FLASHTERM_TTS_RENDER");
+  return runnable(command) ? command : Command();
 }
 
-bool render(const std::string& text, const std::string& output_path) {
-  const Command command = renderer();
+bool runnable(const Command& command) {
+  return !command.empty() && !find_in_path(command[0]).empty();
+}
+
+bool render(const Command& command, const std::string& text,
+            const std::string& output_path) {
   if (command.empty() || text.empty()) return false;
   return run_with_input(substitute(command, output_path), text);
 }

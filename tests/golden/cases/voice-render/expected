@@ -1,0 +1,15 @@
+--- output ---
+Rendering audio for 1 card in deck.txt
+  rendered  audio/<ID1>.wav  Bonjour
+
+1 rendered, 0 skipped, 0 failed
+--- exit status ---
+0
+--- file audio/<ID1>.wav ---
+Bonjour
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>,audio/<ID1>.wav
+--- file played.txt ---
+piper: audio/<ID1>.wav  (fr_FR-siwis-medium.onnx)
+--- file voices/fr_FR-siwis-medium.onnx ---
+model bytes

@@ -1,8 +1,13 @@
 #pragma once
 #include <string>
+#include <vector>
 
 namespace FlashTerm {
 namespace audio {
+// A program and its arguments, ready to run. Never a shell command line: every
+// element is one argument, so deck text in the last of them cannot become
+// anything else.
+using Command = std::vector<std::string>;
 // True when this machine can make a sound at all: either a player for the
 // recorded files a deck may point at, or a speech synthesiser to fall back on.
 // Review asks before offering the key, the same way it withholds "?" on a card
@@ -24,25 +29,27 @@ bool play(const std::string& file, const std::string& text);
 std::string speaker_name();
 std::string player_name();
 
-// Renders `text` to a sound file at `output_path`, for --generate-audio.
+// Runs `command` with `text` on its standard input, writing a sound file. Every
+// occurrence of "{out}" in the arguments is replaced with `output_path` first.
 //
-// The command comes from FLASHTERM_TTS_RENDER, where "{out}" stands for the
-// output path and the text arrives on standard input. Two substitutions rather
-// than one because rendering to a file is not shaped like speaking aloud: a
-// synthesiser needs to be told where to write. Text on stdin rather than as an
-// argument because that is the one convention both candidates already have:
+// Two substitutions rather than one because rendering to a file is not shaped
+// like speaking aloud: a synthesiser needs to be told where to write. Text on
+// standard input because that is the one convention every candidate already
+// has, whatever it calls its output flag:
 //
 //   piper -m fr_FR-siwis-medium -f {out}
 //   espeak-ng -v fr --stdin -w {out}
-//
-// Returns false if the variable is unset, the command is not runnable, or it
-// exits non-zero. There is no default: piper cannot be run without naming a
-// voice, and a guessed language would quietly render a French deck in English.
-bool render(const std::string& text, const std::string& output_path);
+bool render(const Command& command, const std::string& text,
+            const std::string& output_path);
 
-// The configured render command's program name, or empty when
-// FLASHTERM_TTS_RENDER is unset or names something that is not runnable. Lets
-// the caller explain which of the two it is rather than only that it failed.
-std::string renderer_name();
+// What FLASHTERM_TTS_RENDER asks for, or empty when it is unset or names a
+// program that is not on the PATH. An explicit setting always wins over the
+// voice FlashTerm would otherwise work out for itself.
+Command render_command_from_environment();
+
+// Whether the command's program exists and can be executed. Checked before a
+// run so that a mistyped name is reported once, up front, rather than as every
+// card in the deck failing in turn.
+bool runnable(const Command& command);
 }  // namespace audio
 }  // namespace FlashTerm

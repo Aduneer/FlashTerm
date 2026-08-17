@@ -1,0 +1,22 @@
+--- output ---
+Rendering audio for 1 card in deck.txt
+FlashTerm: no piper voice called "fr_FR-siwis-medium".
+
+Installed voices:
+
+  de_DE-thorsten-medium
+
+Use one with:
+
+  FlashTerm deck.txt --generate-audio --voice de_DE-thorsten-medium
+
+To download fr_FR-siwis-medium as well:
+
+  <ROOT>/tests/golden/fakebin/python3 -m piper.download_voices fr_FR-siwis-medium \
+    --download-dir ./.local/share/piper-voices
+--- exit status ---
+1
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>
+--- file voices/de_DE-thorsten-medium.onnx ---
+model bytes

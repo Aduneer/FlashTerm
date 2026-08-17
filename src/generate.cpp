@@ -7,6 +7,7 @@
 #include <string>
 
 #include "audio.h"
+#include "voice.h"
 
 namespace FlashTerm {
 namespace {
@@ -37,19 +38,35 @@ bool file_exists(const std::string& path) {
 }
 }  // namespace
 
-GenerateResult generate_audio(Deck& deck, bool force, std::ostream& out,
-                              std::ostream& errors) {
+GenerateResult generate_audio(Deck& deck, const std::string& voice, bool force,
+                              std::ostream& out, std::ostream& errors) {
   GenerateResult result;
 
-  if (audio::renderer_name().empty()) {
-    errors << "FlashTerm: FLASHTERM_TTS_RENDER is not set to a runnable "
-              "command.\n\n"
-              "It names the synthesiser, with {out} for the file to write and "
-              "the text arriving\non standard input. For example:\n\n"
-              "  FLASHTERM_TTS_RENDER=\"piper -m fr_FR-siwis-medium -f {out}\"\n"
+  // An explicit command is a deliberate one, so it beats a named voice rather
+  // than the other way round.
+  audio::Command renderer = audio::render_command_from_environment();
+  if (renderer.empty() && !voice.empty()) {
+    renderer = voice::render_command(voice);
+    if (renderer.empty()) {
+      errors << "FlashTerm: no piper voice called \"" << voice << "\".\n\n"
+             << voice::setup_instructions(voice, deck.path());
+      result.failed = 1;
+      return result;
+    }
+  }
+  if (renderer.empty()) {
+    errors << "FlashTerm: --generate-audio needs a voice.\n\n"
+              "Name one with --voice, for example:\n\n"
+              "  FlashTerm "
+           << deck.path()
+           << " --generate-audio --voice fr_FR-siwis-medium\n\n"
+              "Or name the synthesiser yourself with FLASHTERM_TTS_RENDER, "
+              "where {out} is\nthe file to write and the text arrives on "
+              "standard input:\n\n"
               "  FLASHTERM_TTS_RENDER=\"espeak-ng -v fr --stdin -w {out}\"\n\n"
               "There is no default because a voice implies a language, and "
-              "guessing it would\nrender a French deck in English.\n";
+              "guessing it would\nrender a French deck in English.\n\n"
+           << voice::setup_instructions("", deck.path());
     result.failed = 1;
     return result;
   }
@@ -75,7 +92,7 @@ GenerateResult generate_audio(Deck& deck, bool force, std::ostream& out,
     }
 
     ensure_directory(directory);
-    if (audio::render(card.question, absolute)) {
+    if (audio::render(renderer, card.question, absolute)) {
       // Only recorded in the deck once the file is really there, so a run that
       // dies partway through leaves no card pointing at nothing.
       if (card.audio != relative) {

@@ -1,0 +1,17 @@
+--- output ---
+Rendering audio for 1 card in deck.txt
+FlashTerm: no piper voice called "fr_FR-siwis-medium".
+
+Piper is installed but has no voices yet. To download one:
+
+  <ROOT>/tests/golden/fakebin/python3 -m piper.download_voices fr_FR-siwis-medium \
+    --download-dir ./.local/share/piper-voices
+
+Voices are named language_REGION-speaker-quality, so es_ES, de_DE,
+it_IT and about thirty more exist. List them all with:
+
+  <ROOT>/tests/golden/fakebin/python3 -m piper.download_voices --help
+--- exit status ---
+1
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>

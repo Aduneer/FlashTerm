@@ -53,6 +53,17 @@ function placeholder(token,   kind, key) {
   line = $0
   gsub(/FlashTerm [0-9]+\.[0-9]+\.[0-9]+/, "FlashTerm <VERSION>", line)
 
+  # Where the checkout happens to live is not a property of the program. A
+  # message that names a tool's location -- and --generate-audio prints one, so
+  # that nobody has to work out where pipx hid its Python -- would otherwise
+  # pass here and fail on any other machine. Done literally rather than as a
+  # pattern, since a path may contain regex metacharacters.
+  if (root != "") {
+    while ((at = index(line, root)) > 0) {
+      line = substr(line, 1, at - 1) "<ROOT>" substr(line, at + length(root))
+    }
+  }
+
   out = ""
   while (match(line, pattern)) {
     out = out substr(line, 1, RSTART - 1) placeholder(substr(line, RSTART, RLENGTH))

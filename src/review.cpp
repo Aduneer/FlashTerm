@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "answer.h"
+#include "audio.h"
 #include "date.h"
 #include "event.h"
 #include "schedule.h"
@@ -252,6 +253,17 @@ CardRefs collect_matches(Deck& deck, const Filters& filters, int today_days) {
   return matches;
 }
 
+// Plays whatever the card is currently showing, and says whether anything came
+// out. In a reversed session what is showing is the answer, and the recording
+// is deliberately skipped there: the audio column holds a reading of the
+// question, which is the very thing being asked for.
+bool play_prompt(const Deck& deck, const Flashcard& card, bool reversed) {
+  const std::string file = reversed ? std::string() : deck.audio_path(card);
+  const std::string text =
+      reversed ? primary_answer(card.answer) : card.question;
+  return audio::play(file, text);
+}
+
 // Shuffles within each box, then concatenates so weaker boxes come first.
 void order_by_box(CardRefs* refs) {
   std::vector<CardRefs> boxes(kMaxBox + 1);
@@ -413,18 +425,30 @@ enum class Action { kContinue, kUndo, kQuit };
 // Editing keeps the prompt open, so a card fixed on the spot can still have
 // its answer taken back in the same breath.
 Action prompt_next_action(Deck& deck, Flashcard& card) {
+  const bool audio_available = audio::available();
   while (true) {
-    std::cout << "\n"
-              << legend({{"Enter", "next card"},
-                         {"e", "edit this card"},
-                         {"u", "undo this answer"},
-                         {"q", "end session"}})
-              << "\n";
+    std::vector<KeyHint> hints = {{"Enter", "next card"}};
+    // The one place a reversed session can hear the question: it has just been
+    // revealed, so there is nothing left to give away. This is also the moment
+    // the pronunciation is worth hearing, right after finding out what the
+    // word was.
+    if (audio_available) hints.push_back({"a", "hear the question"});
+    hints.push_back({"e", "edit this card"});
+    hints.push_back({"u", "undo this answer"});
+    hints.push_back({"q", "end session"});
+    std::cout << "\n" << legend(hints) << "\n";
     print_prompt();
     const std::string action = to_lowercase(read_choice());
 
     if (action == "q") return Action::kQuit;
     if (action == "u") return Action::kUndo;
+    if (audio_available && action == "a") {
+      if (!audio::play(deck.audio_path(card), card.question)) {
+        std::cout << color::yellow << "No audio available for this card.\n"
+                  << color::reset;
+      }
+      continue;  // this prompt does not redraw, so the message survives
+    }
     if (action == "e") {
       edit_card_fields(card);
       autosave(deck);
@@ -603,7 +627,14 @@ void review_flashcards(Deck& deck) {
     // the prompt after the answer, which is never ambiguous.
     const bool hint_available = !check_answer("?", expected).exact;
     const bool quit_available = !check_answer("q", expected).exact;
+    // Audio is offered on the same terms, plus one more: there has to be
+    // something on this machine that can make a sound. What it plays is
+    // whatever is on screen, which is what keeps it from giving the answer
+    // away in a reversed session.
+    const bool audio_available =
+        audio::available() && !check_answer("a", expected).exact;
     bool hinted = false;
+    bool audio_failed = false;
     bool quit_requested = false;
     std::string typed;
     while (true) {
@@ -623,14 +654,27 @@ void review_flashcards(Deck& deck) {
         std::cout << color::yellow << "Hint: " << hint_for(expected) << "\n"
                   << color::reset;
       }
+      // Said on the redraw rather than at the moment of failure, because the
+      // redraw is what would have wiped it. A missing recording is not worth
+      // interrupting a review over; it is worth not leaving the user pressing
+      // a key that appears to do nothing.
+      if (audio_failed) {
+        std::cout << color::yellow << "No audio available for this card.\n"
+                  << color::reset;
+      }
 
       std::vector<KeyHint> hints = {{"Enter", "submit"}};
+      if (audio_available) hints.push_back({"a", "play audio"});
       if (hint_available && !hinted) hints.push_back({"?", "hint"});
       if (quit_available) hints.push_back({"q", "end session"});
       std::cout << legend(hints) << "\n";
 
       typed = prompt(question_label);
       const std::string command = to_lowercase(trim(typed));
+      if (audio_available && command == "a") {
+        audio_failed = !play_prompt(deck, card, session.reversed);
+        continue;  // same card, unanswered; playing is not an attempt
+      }
       if (hint_available && !hinted && command == "?") {
         hinted = true;
         continue;  // same card, now with the hint on screen

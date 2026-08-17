@@ -34,7 +34,7 @@ Loaded 1 flashcards from deck.txt
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 
-[Enter] submit   [?] hint   [q] end session
+[Enter] submit   [a] play audio   [?] hint   [q] end session
 Your answer: Progress: [████████████████████] 100% (1/1 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -46,13 +46,13 @@ Your answer: Progress: [██████████████████�
 └──────────────────────────────────────────────────────────────┘
 
 Hint: H····
-[Enter] submit   [q] end session
+[Enter] submit   [a] play audio   [q] end session
 Your answer: 
 ✅ Correct!
 Counted as a partial — the hint means this card stays where it is.
 Next review in 1 day (<DATE1>).
 
-[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
 > ==================================================
                  REVIEW COMPLETE                  
 ==================================================

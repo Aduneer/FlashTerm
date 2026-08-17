@@ -34,13 +34,13 @@ Loaded 1 flashcards from deck.txt
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 
-[Enter] submit   [?] hint   [q] end session
+[Enter] submit   [a] play audio   [?] hint   [q] end session
 Your answer: 
 ✅ Correct!
 Card promoted to Box 2!
 Next review in 3 days (<DATE1>).
 
-[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
 > ==================================================
                  REVIEW COMPLETE                  
 ==================================================

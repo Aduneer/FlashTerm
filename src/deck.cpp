@@ -30,13 +30,22 @@ std::string errno_message() {
 }  // namespace
 
 std::string card_to_csv(const Flashcard& card) {
-  return escape_csv_field(card.question) + "," + escape_csv_field(card.answer) +
-         "," + escape_csv_field(card.tags_to_string()) + "," +
-         std::to_string(card.times_correct) + "," +
-         std::to_string(card.times_incorrect) + "," +
-         std::to_string(card.leitner_box) + "," +
-         format_date(card.last_reviewed) + "," + format_date(card.due_date) +
-         "," + escape_csv_field(card.id);
+  const std::string row =
+      escape_csv_field(card.question) + "," + escape_csv_field(card.answer) +
+      "," + escape_csv_field(card.tags_to_string()) + "," +
+      std::to_string(card.times_correct) + "," +
+      std::to_string(card.times_incorrect) + "," +
+      std::to_string(card.leitner_box) + "," +
+      format_date(card.last_reviewed) + "," + format_date(card.due_date) + "," +
+      escape_csv_field(card.id);
+
+  // Written only when the card has one. A deck with no audio -- which is most
+  // decks -- then comes out byte for byte as every earlier version wrote it.
+  // That matters because decks are synced between machines as plain files: a
+  // trailing comma on every line would put the whole deck in conflict the
+  // first time one machine saved it and the other had not updated yet.
+  if (card.audio.empty()) return row;
+  return row + "," + escape_csv_field(card.audio);
 }
 
 bool card_from_csv(const std::string& line, Flashcard* out) {
@@ -57,13 +66,25 @@ bool card_from_csv(const std::string& line, Flashcard* out) {
       (fields.size() >= 7) ? parse_date(fields[6]) : kNoDate;
   out->due_date = (fields.size() >= 8) ? parse_date(fields[7]) : kNoDate;
   // A deck written before ids existed simply has no ninth field; the card gets
-  // one when it joins a deck.
+  // one when it joins a deck. The tenth is newer still and is usually absent
+  // even in decks that have everything else, since most cards have no
+  // recording.
   out->id = (fields.size() >= 9) ? trim(fields[8]) : "";
+  out->audio = (fields.size() >= 10) ? trim(fields[9]) : "";
   return true;
 }
 
 Deck::Deck(std::string path)
     : path_(std::move(path)), log_(log_path_for(path_)) {}
+
+std::string Deck::audio_path(const Flashcard& card) const {
+  if (card.audio.empty() || card.audio[0] == '/') return card.audio;
+  const std::size_t slash = path_.find_last_of('/');
+  // A bare deck name means the deck is in the working directory, and so is
+  // anything relative to it.
+  if (slash == std::string::npos) return card.audio;
+  return path_.substr(0, slash + 1) + card.audio;
+}
 
 bool Deck::load() {
   cards_.clear();

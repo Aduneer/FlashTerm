@@ -8,7 +8,9 @@
 namespace FlashTerm {
 
 // One card as a CSV record:
-//   question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id
+//   question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id,audio
+// Trailing columns are optional when reading, so a deck written by any earlier
+// version still loads; writing always emits all of them.
 std::string card_to_csv(const Flashcard& card);
 // Returns false for records too short to be a card. Missing trailing fields
 // fall back to their defaults, so a bare "question,answer" line still loads
@@ -47,6 +49,12 @@ class Deck {
   bool save(std::string* error = nullptr) const;
 
   const std::string& path() const { return path_; }
+
+  // Where a card's recording actually is. The stored path is relative to the
+  // deck file rather than to the working directory, so that a deck and the
+  // audio beside it survive being moved, synced or studied from elsewhere; an
+  // absolute path is taken as given, and no path stays empty.
+  std::string audio_path(const Flashcard& card) const;
 
   // The review log lives beside the deck file and is loaded along with it: it
   // is part of the deck's representation on disk, not a separate thing the

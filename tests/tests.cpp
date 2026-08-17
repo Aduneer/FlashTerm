@@ -439,6 +439,64 @@ void test_card_csv() {
   EXPECT_TRUE(!card_from_csv("just-a-question", &rejected));
 }
 
+void test_card_audio_column() {
+  // A card with no recording is written exactly as it was before the column
+  // existed. Decks are synced between machines as files, so a version that
+  // rewrote every row would put the whole deck in conflict.
+  Flashcard silent("Q", "A");
+  silent.id = "abc";
+  EXPECT_EQ(card_to_csv(silent), std::string("Q,A,,0,0,1,,,abc"));
+
+  Flashcard voiced("Bonjour", "Hello", {"french"});
+  voiced.id = "def";
+  voiced.audio = "audio/bonjour.wav";
+  EXPECT_EQ(card_to_csv(voiced),
+            std::string("Bonjour,Hello,french,0,0,1,,,def,audio/bonjour.wav"));
+
+  Flashcard parsed("", "");
+  EXPECT_TRUE(card_from_csv(card_to_csv(voiced), &parsed));
+  EXPECT_EQ(parsed.audio, voiced.audio);
+
+  // Reading a row from any earlier version leaves the card silent rather than
+  // failing to load it.
+  Flashcard older("", "");
+  EXPECT_TRUE(card_from_csv("Q,A,,0,0,1,,,abc", &older));
+  EXPECT_EQ(older.audio, std::string(""));
+
+  // A path with a comma in it has to survive the round trip like any other
+  // field, or the column silently truncates.
+  Flashcard awkward("Q", "A");
+  awkward.audio = "audio/one, two.wav";
+  Flashcard reparsed("", "");
+  EXPECT_TRUE(card_from_csv(card_to_csv(awkward), &reparsed));
+  EXPECT_EQ(reparsed.audio, awkward.audio);
+}
+
+void test_audio_path_resolution() {
+  Flashcard card("Bonjour", "Hello");
+  card.audio = "audio/bonjour.wav";
+
+  // Relative to the deck rather than to the working directory, so that
+  // studying a deck from elsewhere still finds its recordings.
+  Deck nested("/home/someone/decks/french.txt");
+  EXPECT_EQ(nested.audio_path(card),
+            std::string("/home/someone/decks/audio/bonjour.wav"));
+
+  // A deck named without a directory is in the working directory, and so is
+  // anything relative to it.
+  Deck bare("french.txt");
+  EXPECT_EQ(bare.audio_path(card), std::string("audio/bonjour.wav"));
+
+  // An absolute path is somewhere specific and is not rewritten.
+  Flashcard absolute("Q", "A");
+  absolute.audio = "/usr/share/sounds/a.wav";
+  EXPECT_EQ(nested.audio_path(absolute), absolute.audio);
+
+  // No recording resolves to no path, rather than to the deck's directory.
+  Flashcard silent("Q", "A");
+  EXPECT_EQ(nested.audio_path(silent), std::string(""));
+}
+
 void test_save_load_roundtrip() {
   const std::string path = temp_path("roundtrip.txt");
   std::remove(path.c_str());
@@ -1424,6 +1482,8 @@ int main() {
   test_record_answer_schedules();
   test_due_counts_and_next_due();
   test_card_csv();
+  test_card_audio_column();
+  test_audio_path_resolution();
   test_save_load_roundtrip();
   test_legacy_deck_migrates();
   test_load_missing_file();

@@ -15,6 +15,10 @@
 # centring all switch themselves off when stdout is not a terminal. Keep it
 # that way: a golden test cannot drive an app that insists on a tty.
 #
+# A case is a directory under cases/ holding an `input` file and, optionally, a
+# starting `deck.txt`, an `args` file, an `env` file of KEY=VALUE lines, and an
+# `audio/` directory of recordings for the deck's audio column to point at.
+#
 # Usage:
 #   tests/golden/run.sh                 run every case
 #   tests/golden/run.sh review-correct  run named cases only
@@ -71,16 +75,38 @@ run_case() {
     args=$(cat "$case_dir/args")
   fi
 
+  # A case may add or override environment variables of its own, one KEY=VALUE
+  # per line. It is how a case says "pretend this machine has no audio", which
+  # cannot be expressed by input alone.
+  case_env=
+  if [ -f "$case_dir/env" ]; then
+    case_env=$(tr '\n' ' ' <"$case_dir/env")
+  fi
+
+  # A case testing recordings ships an audio/ directory beside its deck, so
+  # that the paths in the deck's audio column resolve to something real.
+  if [ -d "$case_dir/audio" ]; then
+    cp -R "$case_dir/audio" "$work_dir/audio"
+  fi
+
   # The host's own settings must not reach the app: FLASHTERM_DECK in the
   # developer's shell would otherwise send every case at their real deck.
   # TZ is pinned because scheduling is in local days while the log is in UTC,
   # and only a fixed zone makes the two agree on which day it is.
   # FLASHTERM_SEED pins the review shuffle, which is what lets a case use more
   # than one card: the input script has to know which card it is answering.
+  # The audio commands are pinned to a stub for the same kind of reason: which
+  # keys review offers depends on what the machine can play, and a transcript
+  # recorded on a developer's laptop would then not match one recorded on CI,
+  # which has neither a synthesiser nor a player. The case env comes last so a
+  # case can override any of it.
   (
     cd "$work_dir"
     # shellcheck disable=SC2086
     env -u FLASHTERM_DECK -u FLASHTERM_THEME TZ=UTC NO_COLOR=1 FLASHTERM_SEED=1 \
+      FLASHTERM_TTS="$script_dir/fake-audio.sh speak" \
+      FLASHTERM_PLAYER="$script_dir/fake-audio.sh play" \
+      $case_env \
       "$bin" $args <"$case_dir/input" >"$captured" 2>&1
   ) && status=0 || status=$?
 

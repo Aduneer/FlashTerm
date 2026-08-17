@@ -24,6 +24,11 @@ class Flashcard {
   // joins a deck, which is what mints it; see Deck::ensure_ids.
   std::string id;
 
+  // A recording of the question, as a path relative to the deck file -- so a
+  // deck and its audio directory move together. Empty is the normal case and
+  // means the question gets spoken by a synthesiser instead; see audio.h.
+  std::string audio;
+
   Flashcard(const std::string& q, const std::string& a,
             const std::vector<std::string>& t = {}, int correct = 0,
             int incorrect = 0, int leitner = 1);

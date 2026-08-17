@@ -27,48 +27,32 @@ Loaded 1 flashcards from deck.txt
 > Progress: [████████████████████] 100% (1/1 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
-│ Box 1 · new · french                                         │
+│ Box 1 · new · french · reversed                              │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│   Bonjour                                                    │
+│   Hello                                                      │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 
 [Enter] submit   [a] play audio   [?] hint   [q] end session
-Your answer: Progress: [████████████████████] 100% (1/1 cards)
+Your question: Progress: [████████████████████] 100% (1/1 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
-│ Box 1 · new · french                                         │
+│ Box 1 · new · french · reversed                              │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│   Bonjour                                                    │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-
-Hint: H····
-[Enter] submit   [a] play audio   [q] end session
-Your answer: 
-✅ Correct!
-Counted as a partial — the hint means this card stays where it is.
-Next review in 1 day (<DATE1>).
-
-[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
-> Progress: [████████████████████] 100% (1/1 cards)
-
-┌──────────────────────────────────────────────────────────────┐
-│ Box 1 · new · french                                         │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│   Bonjour                                                    │
+│   Hello                                                      │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 
 [Enter] submit   [a] play audio   [?] hint   [q] end session
-Your answer: 
+Your question: 
 ✅ Correct!
 Card promoted to Box 2!
-Next review in 3 days (<DATE2>).
+Next review in 3 days (<DATE1>).
 
+[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
+> 
 [Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
 > ==================================================
                  REVIEW COMPLETE                  
@@ -95,9 +79,12 @@ Next review in 3 days (<DATE2>).
 > Flashcards saved. Goodbye!
 --- exit status ---
 0
+--- file audio/bonjour.wav ---
+fake recording
 --- file deck.txt ---
-Bonjour,Hello,french,1,0,2,<DATE3>,<DATE2>,<ID1>
+Bonjour,Hello,french,1,0,2,<DATE2>,<DATE1>,<ID1>,audio/bonjour.wav
 --- file deck.txt.log ---
-<ID2>,<ID1>,<TIME>,n,partial,1,1,
-<ID3>,<ID1>,<TIME>,n,undo,1,1,<ID2>
-<ID4>,<ID1>,<TIME>,n,correct,1,2,
+<ID2>,<ID1>,<TIME>,r,correct,1,2,
+--- file played.txt ---
+speak: Hello
+play: audio/bonjour.wav

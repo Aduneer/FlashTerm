@@ -14,8 +14,10 @@
 Output demo/demo.gif
 
 Set Shell "bash"
-# 900x720 at FontSize 16 fits the statistics dashboard, which is the tallest
-# screen at 29 lines. Anything shorter clips its title off the top.
+# 900x770 at FontSize 16 fits the statistics dashboard, which is the tallest
+# screen at 31 lines. Anything shorter clips its title off the top. It grew by
+# two when the review log added "Reviewed Today" and "Current Streak" to it, so
+# re-measure this if anything else is ever added to that screen.
 #
 # The README displays this at width=640 to keep it from eating a whole screen of
 # scroll, so the extra native resolution is not wasted: it supersamples down
@@ -27,7 +29,7 @@ Set Shell "bash"
 # progress bars and the sheer volume of distinct text, not the frame count.
 Set FontSize 16
 Set Width 900
-Set Height 720
+Set Height 770
 Set Padding 20
 Set Theme "Dracula"
 Set TypingSpeed 75ms

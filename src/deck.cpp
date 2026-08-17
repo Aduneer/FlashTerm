@@ -35,7 +35,8 @@ std::string card_to_csv(const Flashcard& card) {
          std::to_string(card.times_correct) + "," +
          std::to_string(card.times_incorrect) + "," +
          std::to_string(card.leitner_box) + "," +
-         format_date(card.last_reviewed) + "," + format_date(card.due_date);
+         format_date(card.last_reviewed) + "," + format_date(card.due_date) +
+         "," + escape_csv_field(card.id);
 }
 
 bool card_from_csv(const std::string& line, Flashcard* out) {
@@ -55,13 +56,21 @@ bool card_from_csv(const std::string& line, Flashcard* out) {
   out->last_reviewed =
       (fields.size() >= 7) ? parse_date(fields[6]) : kNoDate;
   out->due_date = (fields.size() >= 8) ? parse_date(fields[7]) : kNoDate;
+  // A deck written before ids existed simply has no ninth field; the card gets
+  // one when it joins a deck.
+  out->id = (fields.size() >= 9) ? trim(fields[8]) : "";
   return true;
 }
 
-Deck::Deck(std::string path) : path_(std::move(path)) {}
+Deck::Deck(std::string path)
+    : path_(std::move(path)), log_(log_path_for(path_)) {}
 
 bool Deck::load() {
   cards_.clear();
+  // A deck with no log yet is the normal starting state, so its absence is not
+  // reported: an empty log and existing counters is a valid deck.
+  log_.load();
+
   std::ifstream file(path_);
   if (!file.is_open()) {
     return false;
@@ -74,6 +83,7 @@ bool Deck::load() {
       cards_.push_back(card);
     }
   }
+  ensure_ids();
   return true;
 }
 
@@ -104,6 +114,23 @@ bool Deck::save(std::string* error) const {
     return false;
   }
   return true;
+}
+
+void Deck::add(const Flashcard& card) {
+  cards_.push_back(card);
+  if (cards_.back().id.empty()) {
+    cards_.back().id = generate_id();
+  }
+}
+
+void Deck::ensure_ids() {
+  std::set<std::string> taken;
+  for (auto& card : cards_) {
+    if (!card.id.empty() && taken.insert(card.id).second) continue;
+    do {
+      card.id = generate_id();
+    } while (!taken.insert(card.id).second);
+  }
 }
 
 bool Deck::remove(std::size_t index) {
@@ -232,6 +259,10 @@ ImportResult import_into(Deck& deck, const std::string& path) {
       ++result.imported;
     }
   }
+  // Re-importing a file that was exported from this deck brings its ids back
+  // with it, so the duplicates have to be resolved before anything can be
+  // logged against them.
+  deck.ensure_ids();
   result.ok = true;
   return result;
 }

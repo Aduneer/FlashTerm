@@ -1,8 +1,11 @@
 // Minimal assert-style harness: no framework, just `make test`.
 #include <clocale>
 #include <cstdio>
+#include <ctime>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -10,6 +13,7 @@
 #include "cli.h"
 #include "date.h"
 #include "deck.h"
+#include "event.h"
 #include "review.h"
 #include "schedule.h"
 #include "text.h"
@@ -753,6 +757,429 @@ void test_cli_parsing() {
   EXPECT_TRUE(!parse({"--nope"}).error.empty());
   EXPECT_TRUE(usage_text().find("--version") != std::string::npos);
 }
+
+// --- Review log ---
+
+// A UTC stamp landing on `day` in local time, whatever the machine's timezone
+// is: noon local can never be pushed onto a neighbouring local day. Streaks
+// are a question about the user's calendar, so the tests have to be able to
+// name a local day without assuming UTC.
+std::string stamp_on_day(int day, int hour = 12) {
+  int year = 0;
+  unsigned month = 0;
+  unsigned mday = 0;
+  civil_from_days(day, &year, &month, &mday);
+
+  std::tm local{};
+  local.tm_year = year - 1900;
+  local.tm_mon = static_cast<int>(month) - 1;
+  local.tm_mday = static_cast<int>(mday);
+  local.tm_hour = hour;
+  local.tm_isdst = -1;  // let the library work out whether DST applies
+  const std::time_t when = std::mktime(&local);
+
+  const std::tm* utc = std::gmtime(&when);
+  char buffer[32];
+  std::snprintf(buffer, sizeof(buffer), "%04d-%02u-%02uT%02u:%02u:%02uZ",
+                utc->tm_year + 1900, static_cast<unsigned>(utc->tm_mon + 1),
+                static_cast<unsigned>(utc->tm_mday),
+                static_cast<unsigned>(utc->tm_hour),
+                static_cast<unsigned>(utc->tm_min),
+                static_cast<unsigned>(utc->tm_sec));
+  return buffer;
+}
+
+ReviewEvent answer_event(const std::string& card_id, const std::string& stamp,
+                         bool correct, int box_before, int box_after) {
+  ReviewEvent event;
+  event.id = generate_id();
+  event.card_id = card_id;
+  event.timestamp = stamp;
+  event.correct = correct;
+  event.box_before = box_before;
+  event.box_after = box_after;
+  return event;
+}
+
+void test_event_ids() {
+  const std::string id = generate_id();
+  EXPECT_EQ(id.size(), size_t{16});
+  EXPECT_TRUE(id.find_first_not_of("0123456789abcdef") == std::string::npos);
+
+  // Ids have to be unique without coordinating with anything, because two
+  // machines mint them independently.
+  std::set<std::string> seen;
+  for (int i = 0; i < 1000; ++i) seen.insert(generate_id());
+  EXPECT_EQ(seen.size(), size_t{1000});
+}
+
+void test_timestamps() {
+  // Unix time is UTC by definition, so this is exact and timezone-free.
+  EXPECT_EQ(parse_timestamp("1970-01-01T00:00:00Z"), std::time_t{0});
+  EXPECT_EQ(parse_timestamp("2026-08-17T14:23:05Z"),
+            static_cast<std::time_t>(days_from_civil(2026, 8, 17)) * 86400 +
+                14 * 3600 + 23 * 60 + 5);
+
+  // Malformed stamps are rejected rather than guessed at.
+  EXPECT_EQ(parse_timestamp(""), std::time_t{-1});
+  EXPECT_EQ(parse_timestamp("2026-08-17"), std::time_t{-1});
+  EXPECT_EQ(parse_timestamp("2026-08-17 14:23:05Z"), std::time_t{-1});
+  EXPECT_EQ(parse_timestamp("2026-08-17T14:23:05"), std::time_t{-1});
+  EXPECT_EQ(parse_timestamp("2026-02-30T00:00:00Z"), std::time_t{-1});
+  EXPECT_EQ(parse_timestamp("2026-08-17T25:00:00Z"), std::time_t{-1});
+
+  // The stamp written now is one that can be read back.
+  const std::string now = now_timestamp();
+  EXPECT_EQ(now.size(), size_t{20});
+  EXPECT_TRUE(parse_timestamp(now) > 0);
+  EXPECT_EQ(local_day_of(now), today());
+
+  // A UTC stamp maps back onto the local day it actually fell on.
+  const int day = days_from_civil(2026, 3, 14);
+  EXPECT_EQ(local_day_of(stamp_on_day(day)), day);
+  EXPECT_EQ(local_day_of(stamp_on_day(day, 1)), day);
+  EXPECT_EQ(local_day_of(stamp_on_day(day, 23)), day);
+  EXPECT_EQ(local_day_of("nonsense"), kNoDate);
+}
+
+void test_event_csv() {
+  ReviewEvent event;
+  event.id = "0123456789abcdef";
+  event.card_id = "fedcba9876543210";
+  event.timestamp = "2026-08-17T14:23:05Z";
+  event.direction = 'r';
+  event.correct = true;
+  event.box_before = 2;
+  event.box_after = 3;
+
+  EXPECT_EQ(event_to_csv(event),
+            std::string("0123456789abcdef,fedcba9876543210,"
+                        "2026-08-17T14:23:05Z,r,correct,2,3,"));
+
+  ReviewEvent parsed;
+  EXPECT_TRUE(event_from_csv(event_to_csv(event), &parsed));
+  EXPECT_EQ(parsed.id, event.id);
+  EXPECT_EQ(parsed.card_id, event.card_id);
+  EXPECT_EQ(parsed.timestamp, event.timestamp);
+  EXPECT_EQ(parsed.direction, 'r');
+  EXPECT_TRUE(parsed.correct);
+  EXPECT_EQ(parsed.box_before, 2);
+  EXPECT_EQ(parsed.box_after, 3);
+  EXPECT_TRUE(!parsed.is_undo());
+
+  // An undo names the answer it takes back and reports no result of its own.
+  ReviewEvent undo;
+  undo.id = "1111111111111111";
+  undo.card_id = event.card_id;
+  undo.timestamp = "2026-08-17T14:23:40Z";
+  undo.undoes = event.id;
+  ReviewEvent undo_parsed;
+  EXPECT_TRUE(event_from_csv(event_to_csv(undo), &undo_parsed));
+  EXPECT_TRUE(undo_parsed.is_undo());
+  EXPECT_EQ(undo_parsed.undoes, event.id);
+
+  // Damaged lines are skipped, never taken as reviews that did not happen.
+  ReviewEvent rejected;
+  EXPECT_TRUE(!event_from_csv("", &rejected));
+  EXPECT_TRUE(!event_from_csv("id,card", &rejected));
+  EXPECT_TRUE(!event_from_csv("id,card,not-a-time,n,correct,1,2,", &rejected));
+  EXPECT_TRUE(
+      !event_from_csv(",card,2026-08-17T14:23:05Z,n,correct,1,2,", &rejected));
+  EXPECT_TRUE(
+      !event_from_csv("id,,2026-08-17T14:23:05Z,n,correct,1,2,", &rejected));
+  // A result and an undo target contradict each other in both directions.
+  EXPECT_TRUE(!event_from_csv(
+      "id,card,2026-08-17T14:23:05Z,n,correct,1,2,target", &rejected));
+  EXPECT_TRUE(
+      !event_from_csv("id,card,2026-08-17T14:23:05Z,n,undo,1,2,", &rejected));
+
+  // Boxes are clamped rather than trusted, as everywhere else.
+  EXPECT_TRUE(
+      event_from_csv("id,card,2026-08-17T14:23:05Z,n,incorrect,0,99,", &parsed));
+  EXPECT_EQ(parsed.box_before, 1);
+  EXPECT_EQ(parsed.box_after, kMaxBox);
+  EXPECT_TRUE(!parsed.correct);
+  // An unknown direction falls back to a normal prompt.
+  EXPECT_EQ(parsed.direction, 'n');
+}
+
+void test_event_log_roundtrip() {
+  const std::string path = temp_path("review.log");
+  std::remove(path.c_str());
+
+  EventLog log(path);
+  // A log that does not exist yet is an empty log, not a failure.
+  EXPECT_TRUE(!log.load());
+  EXPECT_TRUE(log.empty());
+
+  const std::string card = generate_id();
+  EXPECT_TRUE(log.append(answer_event(card, "2026-08-17T09:00:00Z", true, 1, 2)));
+  EXPECT_TRUE(
+      log.append(answer_event(card, "2026-08-17T09:01:00Z", false, 2, 1)));
+  EXPECT_EQ(log.events().size(), size_t{2});
+
+  EventLog reloaded(path);
+  EXPECT_TRUE(reloaded.load());
+  EXPECT_EQ(reloaded.events().size(), size_t{2});
+  EXPECT_EQ(reloaded.events()[0].card_id, card);
+  EXPECT_TRUE(reloaded.events()[0].correct);
+  EXPECT_TRUE(!reloaded.events()[1].correct);
+
+  // Appending is additive: a second session extends the file rather than
+  // replacing it, which is what makes the log mergeable at all.
+  EXPECT_TRUE(
+      reloaded.append(answer_event(card, "2026-08-17T09:02:00Z", true, 1, 2)));
+  EventLog again(path);
+  EXPECT_TRUE(again.load());
+  EXPECT_EQ(again.events().size(), size_t{3});
+
+  std::remove(path.c_str());
+}
+
+void test_event_log_survives_damage() {
+  const std::string path = temp_path("damaged.log");
+  {
+    std::ofstream file(path);
+    file << "aaaaaaaaaaaaaaaa,card1,2026-08-17T09:00:00Z,n,correct,1,2,\n"
+         << "\n"
+         << "this line is not an event\n"
+         << "bbbbbbbbbbbbbbbb,card1,garbage,n,correct,1,2,\n"
+         << "cccccccccccccccc,card1,2026-08-17T09:05:00Z,r,incorrect,2,1,\n";
+  }
+
+  EventLog log(path);
+  EXPECT_TRUE(log.load());
+  // The two readable events survive; the blank, the junk and the one with an
+  // unusable timestamp are dropped.
+  EXPECT_EQ(log.events().size(), size_t{2});
+  EXPECT_EQ(log.events()[1].direction, 'r');
+
+  std::remove(path.c_str());
+}
+
+void test_event_log_write_failure() {
+  // An unwritable path has to be reported, but the event still happened, so
+  // it stays in memory and the review it belongs to is not lost.
+  EventLog log(temp_path("no-such-dir/review.log"));
+  std::string error;
+  EXPECT_TRUE(!log.append(answer_event("card1", "2026-08-17T09:00:00Z", true, 1, 2),
+                          &error));
+  EXPECT_TRUE(!error.empty());
+  EXPECT_EQ(log.events().size(), size_t{1});
+}
+
+void test_merge_events() {
+  const std::string card = "card1";
+  const ReviewEvent first = answer_event(card, "2026-08-17T09:00:00Z", true, 1, 2);
+  const ReviewEvent second = answer_event(card, "2026-08-17T21:00:00Z", false, 2, 1);
+  const ReviewEvent third = answer_event(card, "2026-08-18T08:00:00Z", true, 1, 2);
+
+  // Two machines that both saw `first` and then diverged.
+  const std::vector<ReviewEvent> left{first, second};
+  const std::vector<ReviewEvent> right{first, third};
+
+  const std::vector<ReviewEvent> merged = merge_events(left, right);
+  // The shared event appears once: a merge is a union, not a concatenation.
+  EXPECT_EQ(merged.size(), size_t{3});
+  EXPECT_EQ(merged[0].id, first.id);
+  EXPECT_EQ(merged[1].id, second.id);
+  EXPECT_EQ(merged[2].id, third.id);
+
+  // Merging the other way round gives exactly the same log, which is the
+  // property that makes syncing order-independent.
+  const std::vector<ReviewEvent> reversed = merge_events(right, left);
+  EXPECT_EQ(reversed.size(), merged.size());
+  for (size_t i = 0; i < merged.size(); ++i) {
+    EXPECT_EQ(event_to_csv(reversed[i]), event_to_csv(merged[i]));
+  }
+
+  // Merging a log with itself changes nothing.
+  EXPECT_EQ(merge_events(merged, merged).size(), size_t{3});
+  EXPECT_EQ(merge_events(merged, {}).size(), size_t{3});
+}
+
+void test_replay() {
+  const int day = days_from_civil(2026, 8, 17);
+  std::vector<ReviewEvent> events;
+  events.push_back(answer_event("card1", stamp_on_day(day - 2), true, 1, 2));
+  events.push_back(answer_event("card1", stamp_on_day(day - 1), true, 2, 3));
+  events.push_back(answer_event("card1", stamp_on_day(day), false, 3, 1));
+  events.push_back(answer_event("card2", stamp_on_day(day), true, 1, 2));
+
+  const std::map<std::string, CardState> states = replay(events);
+  EXPECT_EQ(states.size(), size_t{2});
+
+  const CardState& one = states.at("card1");
+  EXPECT_EQ(one.times_correct, 2);
+  EXPECT_EQ(one.times_incorrect, 1);
+  EXPECT_EQ(one.leitner_box, 1);
+  EXPECT_EQ(one.last_reviewed, day);
+  // The schedule is recomputed from the box, not remembered.
+  EXPECT_EQ(one.due_date, day + interval_for_box(1));
+
+  const CardState& two = states.at("card2");
+  EXPECT_EQ(two.times_correct, 1);
+  EXPECT_EQ(two.leitner_box, 2);
+  EXPECT_EQ(two.due_date, day + interval_for_box(2));
+
+  // Replaying a shuffled log gives the same answer: order comes from the
+  // timestamps, not from the order the events happen to be stored in.
+  std::vector<ReviewEvent> shuffled{events[3], events[1], events[0], events[2]};
+  const std::map<std::string, CardState> again = replay(shuffled);
+  EXPECT_EQ(again.at("card1").leitner_box, one.leitner_box);
+  EXPECT_EQ(again.at("card1").times_correct, one.times_correct);
+  EXPECT_EQ(again.at("card1").due_date, one.due_date);
+
+  // An answer that was taken back leaves no trace in the replayed state, even
+  // though it is still there in the log.
+  ReviewEvent undo;
+  undo.id = generate_id();
+  undo.card_id = "card1";
+  undo.timestamp = stamp_on_day(day, 13);
+  undo.undoes = events[2].id;
+  events.push_back(undo);
+
+  const std::map<std::string, CardState> undone = replay(events);
+  EXPECT_EQ(undone.at("card1").times_incorrect, 0);
+  EXPECT_EQ(undone.at("card1").times_correct, 2);
+  EXPECT_EQ(undone.at("card1").leitner_box, 3);
+
+  EXPECT_TRUE(replay({}).empty());
+}
+
+void test_summarize() {
+  const int today_days = today();
+
+  std::vector<ReviewEvent> events;
+  events.push_back(answer_event("card1", stamp_on_day(today_days), true, 1, 2));
+  events.push_back(answer_event("card1", stamp_on_day(today_days, 14), false, 2, 1));
+  events.push_back(answer_event("card2", stamp_on_day(today_days), true, 1, 2));
+  events.push_back(answer_event("card2", stamp_on_day(today_days - 1), true, 1, 2));
+  events.push_back(answer_event("card2", stamp_on_day(today_days - 2), true, 1, 2));
+
+  LogStats stats = summarize(events, today_days);
+  EXPECT_EQ(stats.reviewed_today, 3);
+  EXPECT_EQ(stats.correct_today, 2);
+  EXPECT_EQ(stats.current_streak, 3);
+
+  // A gap ends the streak: the run before it is history, not part of today's.
+  events.push_back(answer_event("card2", stamp_on_day(today_days - 4), true, 1, 2));
+  events.push_back(answer_event("card2", stamp_on_day(today_days - 5), true, 1, 2));
+  stats = summarize(events, today_days);
+  EXPECT_EQ(stats.current_streak, 3);
+
+  // Today has not finished yet, so a streak that ran through yesterday is
+  // still alive at breakfast.
+  const std::vector<ReviewEvent> yesterday{
+      answer_event("card1", stamp_on_day(today_days - 1), true, 1, 2),
+      answer_event("card1", stamp_on_day(today_days - 2), true, 1, 2)};
+  stats = summarize(yesterday, today_days);
+  EXPECT_EQ(stats.reviewed_today, 0);
+  EXPECT_EQ(stats.current_streak, 2);
+
+  // A whole empty day does end it.
+  const std::vector<ReviewEvent> stale{
+      answer_event("card1", stamp_on_day(today_days - 2), true, 1, 2)};
+  EXPECT_EQ(summarize(stale, today_days).current_streak, 0);
+
+  // Undone answers are not reviews, in the summary as in the replay.
+  ReviewEvent undo;
+  undo.id = generate_id();
+  undo.card_id = "card1";
+  undo.timestamp = stamp_on_day(today_days, 15);
+  undo.undoes = events[0].id;
+  events.push_back(undo);
+  stats = summarize(events, today_days);
+  EXPECT_EQ(stats.reviewed_today, 2);
+  EXPECT_EQ(stats.correct_today, 1);
+
+  stats = summarize({}, today_days);
+  EXPECT_EQ(stats.reviewed_today, 0);
+  EXPECT_EQ(stats.current_streak, 0);
+}
+
+void test_card_ids() {
+  const std::string path = temp_path("ids.txt");
+  const std::string log = log_path_for(path);
+  std::remove(path.c_str());
+  std::remove(log.c_str());
+
+  EXPECT_EQ(log, path + ".log");
+
+  // A deck written before ids existed gets them on load, and they stick.
+  {
+    std::ofstream file(path);
+    file << "Q1,A1,tag,3,1,4,2026-08-01,2026-08-15\n"
+         << "Q2,A2,,0,0,1\n";
+  }
+  Deck deck(path);
+  EXPECT_TRUE(deck.load());
+  EXPECT_EQ(deck.size(), size_t{2});
+  EXPECT_TRUE(!deck.cards()[0].id.empty());
+  EXPECT_TRUE(!deck.cards()[1].id.empty());
+  EXPECT_TRUE(deck.cards()[0].id != deck.cards()[1].id);
+
+  const std::string first_id = deck.cards()[0].id;
+  EXPECT_TRUE(deck.save());
+  Deck reloaded(path);
+  EXPECT_TRUE(reloaded.load());
+  EXPECT_EQ(reloaded.cards()[0].id, first_id);
+  // The rest of the card is untouched by gaining an identity.
+  EXPECT_EQ(reloaded.cards()[0].leitner_box, 4);
+  EXPECT_EQ(reloaded.cards()[0].due_date, days_from_civil(2026, 8, 15));
+
+  // A card added at runtime is minted one immediately.
+  reloaded.add(Flashcard("Q3", "A3"));
+  EXPECT_TRUE(!reloaded.cards()[2].id.empty());
+
+  // Re-importing an export of this deck must not leave two cards claiming one
+  // history: the newcomers are renamed, the originals keep their ids.
+  const std::string exported = temp_path("ids-export.txt");
+  std::string error;
+  EXPECT_TRUE(export_deck(reloaded, exported, &error));
+  const ImportResult result = import_into(reloaded, exported);
+  EXPECT_TRUE(result.ok);
+  EXPECT_EQ(result.imported, 3);
+  EXPECT_EQ(reloaded.size(), size_t{6});
+  EXPECT_EQ(reloaded.cards()[0].id, first_id);
+
+  std::set<std::string> ids;
+  for (const auto& card : reloaded.cards()) {
+    EXPECT_TRUE(!card.id.empty());
+    ids.insert(card.id);
+  }
+  EXPECT_EQ(ids.size(), size_t{6});
+
+  std::remove(path.c_str());
+  std::remove(log.c_str());
+  std::remove(exported.c_str());
+}
+
+void test_deck_carries_its_log() {
+  const std::string path = temp_path("logged.txt");
+  const std::string log = log_path_for(path);
+  std::remove(path.c_str());
+  std::remove(log.c_str());
+
+  {
+    Deck deck(path);
+    deck.add(Flashcard("Q", "A"));
+    EXPECT_TRUE(deck.save());
+    EXPECT_EQ(deck.log().path(), log);
+    EXPECT_TRUE(deck.log().append(answer_event(deck.cards()[0].id,
+                                               now_timestamp(), true, 1, 2)));
+  }
+
+  // Loading the deck brings its log back with it, without being asked.
+  Deck reloaded(path);
+  EXPECT_TRUE(reloaded.load());
+  EXPECT_EQ(reloaded.log().events().size(), size_t{1});
+  EXPECT_EQ(reloaded.log().events()[0].card_id, reloaded.cards()[0].id);
+  EXPECT_EQ(summarize(reloaded.log().events(), today()).reviewed_today, 1);
+
+  std::remove(path.c_str());
+  std::remove(log.c_str());
+}
 }  // namespace
 
 int main() {
@@ -790,6 +1217,17 @@ int main() {
   test_cli_parsing();
   test_find();
   test_reverse_prompting();
+  test_event_ids();
+  test_timestamps();
+  test_event_csv();
+  test_event_log_roundtrip();
+  test_event_log_survives_damage();
+  test_event_log_write_failure();
+  test_merge_events();
+  test_replay();
+  test_summarize();
+  test_card_ids();
+  test_deck_carries_its_log();
 
   std::cout << "\n" << (g_checks - g_failures) << "/" << g_checks
             << " checks passed\n";

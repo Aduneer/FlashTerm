@@ -9,6 +9,7 @@
 
 #include "answer.h"
 #include "date.h"
+#include "event.h"
 #include "schedule.h"
 #include "terminal.h"
 #include "text.h"
@@ -283,6 +284,43 @@ Action prompt_next_action(Deck& deck, Flashcard& card) {
   }
 }
 
+// The log is a side record, never a gate: a review that cannot be written to
+// it still counts, and the user hears about it once rather than after every
+// card. Returns the event id so an undo can name what it takes back.
+std::string log_event(Deck& deck, const ReviewEvent& event, bool* warned) {
+  std::string error;
+  if (!deck.log().append(event, &error) && !*warned) {
+    *warned = true;
+    std::cout << color::yellow << "Review log unavailable: " << error << "\n"
+              << color::reset;
+  }
+  return event.id;
+}
+
+std::string log_answer(Deck& deck, const Flashcard& card, bool reversed,
+                       bool correct, const AnswerResult& result,
+                       bool* warned) {
+  ReviewEvent event;
+  event.id = generate_id();
+  event.card_id = card.id;
+  event.timestamp = now_timestamp();
+  event.direction = reversed ? 'r' : 'n';
+  event.correct = correct;
+  event.box_before = result.old_box;
+  event.box_after = result.new_box;
+  return log_event(deck, event, warned);
+}
+
+void log_undo(Deck& deck, const Flashcard& card, const std::string& answer_id,
+              bool* warned) {
+  ReviewEvent event;
+  event.id = generate_id();
+  event.card_id = card.id;
+  event.timestamp = now_timestamp();
+  event.undoes = answer_id;
+  log_event(deck, event, warned);
+}
+
 void print_schedule(const AnswerResult& result) {
   if (result.new_box > result.old_box) {
     std::cout << color::green << "Card promoted to Box " << result.new_box
@@ -378,6 +416,7 @@ void review_flashcards(Deck& deck) {
 
   int correct_total = 0;
   int wrong_total = 0;
+  bool log_warned = false;
 
   size_t idx = 0;
   while (idx < matches.size()) {
@@ -424,11 +463,18 @@ void review_flashcards(Deck& deck) {
     print_schedule(result);
 
     autosave(deck);
+    // Logged as soon as it happens rather than once the user moves on, so
+    // that closing the terminal at the prompt below cannot leave an answer
+    // that the counters kept but the log never saw.
+    const std::string answer_id =
+        log_answer(deck, card, session.reversed, counted_correct, result,
+                   &log_warned);
 
     if (prompt_next_action(deck, card) == Action::kUndo) {
       restore_state(&card, before);
       (counted_correct ? correct_total : wrong_total)--;
       autosave(deck);
+      log_undo(deck, card, answer_id, &log_warned);
       continue;  // same card, asked again
     }
     ++idx;

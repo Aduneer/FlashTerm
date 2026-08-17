@@ -2,12 +2,13 @@
 #include <string>
 #include <vector>
 
+#include "event.h"
 #include "flashcard.h"
 
 namespace FlashTerm {
 
 // One card as a CSV record:
-//   question,answer,tags,correct,incorrect,box,last_reviewed,due_date
+//   question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id
 std::string card_to_csv(const Flashcard& card);
 // Returns false for records too short to be a card. Missing trailing fields
 // fall back to their defaults, so a bare "question,answer" line still loads
@@ -47,12 +48,21 @@ class Deck {
 
   const std::string& path() const { return path_; }
 
+  // The review log lives beside the deck file and is loaded along with it: it
+  // is part of the deck's representation on disk, not a separate thing the
+  // caller has to know about. Appends go straight to the file, so unlike the
+  // cards it needs no saving.
+  EventLog& log() { return log_; }
+  const EventLog& log() const { return log_; }
+
   std::vector<Flashcard>& cards() { return cards_; }
   const std::vector<Flashcard>& cards() const { return cards_; }
   std::size_t size() const { return cards_.size(); }
   bool empty() const { return cards_.empty(); }
 
-  void add(const Flashcard& card) { cards_.push_back(card); }
+  // Mints an id for the card if it does not have one, so that every card in a
+  // deck can be named by the log.
+  void add(const Flashcard& card);
   bool remove(std::size_t index);
 
   // Positions of the cards matching `query` as a case-insensitive substring of
@@ -72,9 +82,17 @@ class Deck {
 
   DeckStats stats(int today_days) const;
 
+  // Gives every card a unique id, minting fresh ones for cards that have none
+  // and for duplicates. Cards arrive without ids from decks written before the
+  // log existed, and duplicated ids arrive from re-importing an export into
+  // the deck it came from — two cards sharing one history would make the log
+  // ambiguous, so the newcomer is renamed rather than the incumbent.
+  void ensure_ids();
+
  private:
   std::string path_;
   std::vector<Flashcard> cards_;
+  EventLog log_;
 };
 
 // Appends the cards in `path` to `deck`, preserving review statistics when

@@ -1,0 +1,69 @@
+--- output ---
+Loaded 2 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (2 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Manage Flashcards ---
+[1] List flashcards
+[2] Edit a flashcard
+[3] Delete a flashcard
+[4] Find flashcards
+[q] Back to the main menu
+> 1. Bonjour - Hello [Tags: french;greeting] (Box 1, due new)
+2. Merci - Thanks|Thank you [Tags: french] (Box 1, due new)
+
+
+--- Manage Flashcards ---
+[1] List flashcards
+[2] Edit a flashcard
+[3] Delete a flashcard
+[4] Find flashcards
+[q] Back to the main menu
+> Search question, answer or tags (Enter to list all): 
+2. Merci - Thanks|Thank you [Tags: french] (Box 1, due new)
+Showing 1 of 2 cards. Numbers are deck positions.
+
+
+--- Manage Flashcards ---
+[1] List flashcards
+[2] Edit a flashcard
+[3] Delete a flashcard
+[4] Find flashcards
+[q] Back to the main menu
+> Search question, answer or tags (Enter to list all): 
+Nothing matches "zzz".
+
+
+--- Manage Flashcards ---
+[1] List flashcards
+[2] Edit a flashcard
+[3] Delete a flashcard
+[4] Find flashcards
+[q] Back to the main menu
+> 
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (2 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Bonjour,Hello,french;greeting,0,0,1,,,<ID1>
+Merci,Thanks|Thank you,french,0,0,1,,,<ID2>

@@ -29,3 +29,6 @@ jobs:
 
       - name: Run tests
         run: make test CXX=${{ matrix.cxx }}
+
+      - name: Run golden end-to-end tests
+        run: make golden CXX=${{ matrix.cxx }}

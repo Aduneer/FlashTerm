@@ -1,0 +1,57 @@
+--- output ---
+Loaded 2 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (2 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> ==================================================
+                 DECK STATISTICS                  
+==================================================
+  Total Cards:          2
+  Overall Success Rate: 0.00%
+  Total Reviews:        0 (0 Correct, 0 Incorrect)
+  Due Now:              2
+  Reviewed Today:       0 (0 Correct, 0 Incorrect)
+  Current Streak:       0 days
+
+--- Leitner Box Distribution ---
+  Box 1 (Weakest): [██████████] 2 cards (100%), every 1d
+  Box 2:           [░░░░░░░░░░] 0 cards (0%), every 3d
+  Box 3:           [░░░░░░░░░░] 0 cards (0%), every 7d
+  Box 4:           [░░░░░░░░░░] 0 cards (0%), every 14d
+  Box 5 (Mastered):[░░░░░░░░░░] 0 cards (0%), every 30d
+
+--------------------------------------------------------------------------------
+                                 CARD PROGRESS
+--------------------------------------------------------------------------------
+Question                           Correct Incorrect   Success  Box     Due
+--------------------------------------------------------------------------------
+Bonjour                                  0         0      0.00    1     new
+Merci                                    0         0      0.00    1     new
+
+[any key] back to the main menu
+> 
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (2 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Bonjour,Hello,french;greeting,0,0,1,,,<ID1>
+Merci,Thanks|Thank you,french,0,0,1,,,<ID2>

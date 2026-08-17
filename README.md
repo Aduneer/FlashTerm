@@ -261,6 +261,42 @@ round-trips, damaged lines, card ids, streaks, and merging and replaying two
 machines' logs), text layout (column-accurate word wrapping), and command-line
 and environment handling.
 
+### Golden End-to-End Tests
+
+```bash
+make golden          # run them
+make check           # unit tests and golden tests together
+```
+
+Where `make test` links the library and calls functions, these drive the real
+binary: each case in `tests/golden/cases/` feeds it a scripted stdin and
+compares the whole transcript — output, exit status, and every file the run
+left behind — against a checked-in copy. That covers `ui.cpp` and `review.cpp`,
+which are hard to reach any other way.
+
+Adding a case means creating a directory under `tests/golden/cases/` with an
+`input` file, optionally a starting `deck.txt` and an `args` file, and then:
+
+```bash
+tests/golden/run.sh --update    # write the expected transcripts
+tests/golden/run.sh some-case   # run named cases only
+```
+
+`--update` rewrites every expected transcript, so read the resulting diff
+before committing it — that diff is the only thing separating a deliberate
+change from a silently accepted regression.
+
+Dates, and the random ids minted for cards and events, are replaced with
+numbered placeholders (`<DATE1>`, `<ID2>`) so that transcripts are stable while
+still recording which id is which. Timestamps become a plain `<TIME>`, because
+whether two events land in the same second depends only on how fast the machine
+ran.
+
+These tests work because every input path falls back to reading whole lines
+when stdin is not a terminal, and colour, screen clearing and vertical centring
+all switch off when stdout is not a terminal. Keep it that way: a golden test
+cannot drive an app that insists on a tty.
+
 ### Project Layout
 
 | File | Responsibility |
@@ -277,14 +313,15 @@ and environment handling.
 | `src/ui.*` | Menus, prompts and the statistics screen |
 | `src/cli.*` | Command-line parsing (`--help`, `--version`, deck path) |
 | `src/main.cpp` | Argument handling and the main menu loop |
-| `tests/tests.cpp` | Test suite (`make test`) |
+| `tests/tests.cpp` | Unit test suite (`make test`) |
+| `tests/golden/` | End-to-end transcript tests (`make golden`) |
 | `demo/demo.tape` | Scripted [vhs](https://github.com/charmbracelet/vhs) recording behind the demo GIF: `vhs demo/demo.tape` |
 
 ---
 
 ## Contributing
 
-Issues and pull requests are welcome. `make test` should pass before you open one; CI runs it on gcc and clang.
+Issues and pull requests are welcome. `make check` should pass before you open one; CI runs both suites on gcc and clang.
 
 ## License
 

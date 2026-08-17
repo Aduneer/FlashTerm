@@ -1,0 +1,29 @@
+--- output ---
+FlashTerm - spaced-repetition flashcards in your terminal.
+
+Usage:
+  FlashTerm [deck]        Study `deck` (default: flashcards.txt).
+  FlashTerm -- <deck>     Study a deck whose name starts with a dash.
+  FlashTerm --help        Show this help and exit.
+  FlashTerm --version     Show the version and exit.
+
+The deck is created if it does not exist, and saved after every answer and
+edit, so interrupting a session costs nothing. Import a starter deck from
+examples/ with menu option 5.
+
+Every answer is also appended to a review log beside the deck, named after it
+with ".log" added, which is where the streak and review-count statistics on the
+progress screen come from.
+
+Menus take a single keypress when run in a terminal, and fall back to reading
+whole lines when input is piped, so scripting still works.
+
+Environment:
+  FLASHTERM_DECK   Deck to study when none is named on the command line. Handy
+                   when the deck lives in a synced directory. A deck given as
+                   an argument still wins.
+  FLASHTERM_THEME  Colour palette: default, ocean or sunset.
+  NO_COLOR         Set to any value to disable coloured output, whatever the
+                   theme says.
+--- exit status ---
+0

@@ -33,6 +33,14 @@ test: $(TEST_TARGET)
 $(TEST_TARGET): tests/tests.cpp $(LIB_OBJS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -I$(SRC_DIR) -o $@ tests/tests.cpp $(LIB_OBJS)
 
+# End-to-end tests: drives the built binary with scripted input and diffs the
+# whole transcript. Needs the binary rather than the library, which is why it
+# is a separate target from `test` -- and why `test` stays the fast one.
+golden: $(TARGET)
+	tests/golden/run.sh
+
+check: test golden
+
 install: $(TARGET)
 	mkdir -p $(BINDIR)
 	install -m 755 $(TARGET) $(BINDIR)/$(TARGET)
@@ -45,4 +53,4 @@ clean:
 
 -include $(OBJS:.o=.d)
 
-.PHONY: all test install uninstall clean
+.PHONY: all test golden check install uninstall clean

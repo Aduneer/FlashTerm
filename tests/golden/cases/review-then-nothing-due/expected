@@ -1,0 +1,98 @@
+--- output ---
+Loaded 1 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (1 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Review ---
+[1] Due now  (1 card)
+[2] All cards
+[3] By tag
+[4] Difficult only  (incorrect > correct)
+[5] By Leitner box, weakest first
+[q] Back to the main menu
+> 
+--- Prompt Direction ---
+[Enter] Normal — question shown, you type the answer
+[r] Reversed — answer shown, you type the question
+> Progress: [████████████████████] 100% (1/1 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french                                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Bonjour                                                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+✅ Correct!
+Card promoted to Box 2!
+Next review in 3 days (<DATE1>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> ==================================================
+                 REVIEW COMPLETE                  
+==================================================
+  Correct:        1
+  Incorrect:      0
+  Total Reviewed: 1
+  Success Rate:   100.00%
+  Still Due:      0
+==================================================
+
+[any key] back to the main menu
+> 
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Review ---
+[1] Due now  (0 cards)
+[2] All cards
+[3] By tag
+[4] Difficult only  (incorrect > correct)
+[5] By Leitner box, weakest first
+[q] Back to the main menu
+> 
+--- Prompt Direction ---
+[Enter] Normal — question shown, you type the answer
+[r] Reversed — answer shown, you type the question
+> Nothing is due right now — you are all caught up!
+The next card is due in 3 days (<DATE1>).
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Bonjour,Hello,french,1,0,2,<DATE2>,<DATE1>,<ID1>
+--- file deck.txt.log ---
+<ID2>,<ID1>,<TIME>,n,correct,1,2,

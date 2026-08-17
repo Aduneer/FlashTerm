@@ -1,0 +1,65 @@
+--- output ---
+Loaded 1 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (1 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Review ---
+[1] Due now  (1 card)
+[2] All cards
+[3] By tag
+[4] Difficult only  (incorrect > correct)
+[5] By Leitner box, weakest first
+[q] Back to the main menu
+> 
+--- Prompt Direction ---
+[Enter] Normal — question shown, you type the answer
+[r] Reversed — answer shown, you type the question
+> Progress: [████████████████████] 100% (1/1 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french                                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Bonjour                                                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: ==================================================
+                  SESSION ENDED                   
+==================================================
+  Correct:        0
+  Incorrect:      0
+  Total Reviewed: 0
+  Success Rate:   0.00%
+  Not Reviewed:   1
+  Still Due:      1
+==================================================
+
+[any key] back to the main menu
+> 
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (1 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>

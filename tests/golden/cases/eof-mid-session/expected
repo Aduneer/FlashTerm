@@ -1,0 +1,23 @@
+--- output ---
+Loaded 1 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (1 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Add a Flashcard ---
+Question, or Enter to cancel.
+> Enter answer (separate alternatives with |, e.g. std::vector|vector): 
+Input stream closed/EOF. Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>

@@ -80,12 +80,37 @@ std::string read_choice() {
   return std::string(1, static_cast<char>(key));
 }
 
-std::string legend(const std::vector<KeyHint>& hints) {
+std::string legend(const std::vector<KeyHint>& hints, std::size_t width) {
+  // Broken between hints rather than left to the terminal, which breaks words:
+  // the prompt after an answer reaches 103 columns once audio is offered, and
+  // an 80-column terminal turned that into "[u] undo this a / nswer". It was
+  // 79 columns before audio existed, which is to say it fit by one column and
+  // nobody had noticed how close it was.
+  //
+  // Not wrap() from text.h, because these strings carry colour escapes and
+  // those are bytes with no width. Measuring each hint before it is painted
+  // sidesteps the question entirely.
+  if (width == 0) width = terminal_width();
+  const std::string separator = "   ";
+
   std::string out;
+  std::size_t column = 0;
   for (const auto& hint : hints) {
-    if (!out.empty()) out += "   ";
+    const std::size_t size =
+        display_width("[" + std::string(hint.key) + "] " + hint.action);
+    if (column == 0) {
+      // Nothing to do: the first hint on a line goes at the margin however
+      // wide it is, since moving it elsewhere would not help.
+    } else if (column + separator.size() + size > width) {
+      out += "\n";
+      column = 0;
+    } else {
+      out += separator;
+      column += separator.size();
+    }
     out += std::string(color::cyan) + "[" + hint.key + "]" + color::reset + " " +
            hint.action;
+    column += size;
   }
   return out;
 }

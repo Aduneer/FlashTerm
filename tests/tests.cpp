@@ -20,6 +20,7 @@
 #include "schedule.h"
 #include "terminal.h"
 #include "text.h"
+#include "ui.h"
 #include "voice.h"
 
 using namespace FlashTerm;
@@ -473,6 +474,48 @@ void test_card_audio_column() {
   Flashcard reparsed("", "");
   EXPECT_TRUE(card_from_csv(card_to_csv(awkward), &reparsed));
   EXPECT_EQ(reparsed.audio, awkward.audio);
+}
+
+void test_legend_wrapping() {
+  // Colours are live until something turns them off, and an escape sequence is
+  // bytes with no width -- which is the whole reason legend() measures each
+  // hint before painting it. Turned off here so the assertions can be about
+  // what the text looks like. NO_COLOR wins over the tty check, so this is the
+  // same either side of a pipe.
+  setenv("NO_COLOR", "1", 1);
+  color::detect();
+  const std::vector<KeyHint> few = {{"Enter", "submit"}, {"q", "end session"}};
+  EXPECT_EQ(legend(few, 80),
+            std::string("[Enter] submit   [q] end session"));
+
+  // The one that regressed: 103 columns, which an 80-column terminal used to
+  // break in the middle of "answer".
+  const std::vector<KeyHint> many = {{"Enter", "next card"},
+                                     {"a", "hear the question"},
+                                     {"e", "edit this card"},
+                                     {"u", "undo this answer"},
+                                     {"q", "end session"}};
+  const std::string wrapped = legend(many, 80);
+  EXPECT_EQ(wrapped,
+            std::string("[Enter] next card   [a] hear the question   "
+                        "[e] edit this card\n"
+                        "[u] undo this answer   [q] end session"));
+
+  // No line of it is wider than it was told to be.
+  for (const std::string& line : split(wrapped, '\n')) {
+    EXPECT_TRUE(display_width(line) <= 80);
+  }
+
+  // Given room, it stays on one line.
+  EXPECT_TRUE(legend(many, 200).find('\n') == std::string::npos);
+
+  // A width narrower than a single hint still puts one on each line rather
+  // than looping or emitting an empty first line.
+  const std::string narrow = legend(many, 5);
+  EXPECT_EQ(split(narrow, '\n').size(), static_cast<std::size_t>(5));
+  EXPECT_TRUE(narrow.compare(0, 7, "[Enter]") == 0);
+
+  EXPECT_EQ(legend({}, 80), std::string(""));
 }
 
 void test_last_nonempty_line() {
@@ -1618,6 +1661,7 @@ int main() {
   test_due_counts_and_next_due();
   test_card_csv();
   test_card_audio_column();
+  test_legend_wrapping();
   test_last_nonempty_line();
   test_voice_discovery();
   test_audio_path_resolution();

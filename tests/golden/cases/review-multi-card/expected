@@ -40,7 +40,8 @@ Your answer:
 Card promoted to Box 2!
 Next review in 3 days (<DATE1>).
 
-[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card
+[u] undo this answer   [q] end session
 > Progress: [████████░░░░░░░░░░░░] 40% (2/5 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -69,7 +70,8 @@ Your answer:
 Counted as a partial — the hint means this card stays where it is.
 Next review in 1 day (<DATE2>).
 
-[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card
+[u] undo this answer   [q] end session
 > Progress: [████████████░░░░░░░░] 60% (3/5 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -85,7 +87,8 @@ Your answer:
 ❌ Incorrect! Correct answer: Goodbye
 Next review in 1 day (<DATE2>).
 
-[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card
+[u] undo this answer   [q] end session
 > Progress: [████████████████░░░░] 80% (4/5 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -102,7 +105,8 @@ Your answer:
 Card promoted to Box 2!
 Next review in 3 days (<DATE1>).
 
-[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card
+[u] undo this answer   [q] end session
 > Progress: [████████████████████] 100% (5/5 cards)
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -119,7 +123,8 @@ Your answer:
 Card promoted to Box 2!
 Next review in 3 days (<DATE1>).
 
-[Enter] next card   [a] hear the question   [e] edit this card   [u] undo this answer   [q] end session
+[Enter] next card   [a] hear the question   [e] edit this card
+[u] undo this answer   [q] end session
 > ==================================================
                  REVIEW COMPLETE                  
 ==================================================

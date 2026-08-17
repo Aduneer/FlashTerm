@@ -31,7 +31,14 @@ struct KeyHint {
 // colour. Every screen that accepts keys builds its footer from this, so the
 // same key is taught the same way wherever it appears — which matters more now
 // that a keypress acts immediately and there is no Enter to take it back.
-std::string legend(const std::vector<KeyHint>& hints);
+// Renders "[Enter] submit   [?] hint" and wraps between hints when they will
+// not fit, rather than leaving the terminal to break a word in half.
+//
+// `width` of 0 means ask the terminal, which is what every caller wants. It is
+// a parameter at all so that the wrapping can be tested at a width the test
+// chooses: reading the real terminal would make the test pass in a terminal
+// and fail in a pipe.
+std::string legend(const std::vector<KeyHint>& hints, std::size_t width = 0);
 
 struct MenuItem {
   std::string key;

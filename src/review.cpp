@@ -41,6 +41,22 @@ struct Session {
   bool reversed = false;
 };
 
+// How the session went. Which counter an outcome belongs in is asked once and
+// answered here, so that the undo below cannot drift from the increment above
+// -- the previous pair of hand-written conditionals was one edit away from
+// crediting a card the user had just taken back.
+struct SessionTally {
+  int correct = 0;
+  int partial = 0;
+  int wrong = 0;
+
+  int& bucket_for(Outcome outcome) {
+    if (outcome == Outcome::kCorrect) return correct;
+    if (outcome == Outcome::kPartial) return partial;
+    return wrong;
+  }
+};
+
 std::mt19937& rng() {
   static std::mt19937 generator(std::random_device{}());
   return generator;
@@ -448,9 +464,14 @@ void print_schedule(const AnswerResult& result) {
 // `skipped` is what was left on the table by ending the session early, which
 // is worth naming: leaving is a normal thing to do, and the summary should
 // still tell you where you got to rather than looking like a finished session.
-void print_summary(int correct, int wrong, int skipped, const Deck& deck,
-                   int today_days) {
-  const int total = correct + wrong;
+// Partials are named rather than folded into either neighbour. They still do
+// not earn a point -- the score they get here is the score record_answer gives
+// the card -- but filing them under "Incorrect" contradicted the "✅ Correct!"
+// the session had just printed, and hid the one number that says how much of
+// the session leant on the hint.
+void print_summary(int correct, int partial, int wrong, int skipped,
+                   const Deck& deck, int today_days) {
+  const int total = correct + partial + wrong;
   const double percent =
       (total > 0) ? static_cast<double>(correct) * 100.0 / total : 0.0;
 
@@ -459,8 +480,13 @@ void print_summary(int correct, int wrong, int skipped, const Deck& deck,
             << (skipped > 0 ? "                  SESSION ENDED                   \n"
                             : "                 REVIEW COMPLETE                  \n")
             << "==================================================\n"
-            << "  Correct:        " << correct << "\n"
-            << "  Incorrect:      " << wrong << "\n"
+            << "  Correct:        " << correct << "\n";
+  // Shown only when it happened, like "Not Reviewed" below: a session with no
+  // hints in it should not have to read a row of zeroes to learn that.
+  if (partial > 0) {
+    std::cout << "  Partial (hint): " << partial << "\n";
+  }
+  std::cout << "  Incorrect:      " << wrong << "\n"
             << "  Total Reviewed: " << total << "\n"
             << "  Success Rate:   " << std::fixed << std::setprecision(2)
             << percent << "%\n";
@@ -533,8 +559,7 @@ void review_flashcards(Deck& deck) {
     order_by_due(&matches);
   }
 
-  int correct_total = 0;
-  int wrong_total = 0;
+  SessionTally tally;
   bool log_warned = false;
 
   size_t idx = 0;
@@ -637,7 +662,7 @@ void review_flashcards(Deck& deck) {
 
     const CardState before = capture_state(card);
     const AnswerResult result = record_answer(&card, outcome, today_days);
-    (outcome == Outcome::kCorrect ? correct_total : wrong_total)++;
+    ++tally.bucket_for(outcome);
     print_schedule(result);
 
     autosave(deck);
@@ -650,7 +675,7 @@ void review_flashcards(Deck& deck) {
     const Action action = prompt_next_action(deck, card);
     if (action == Action::kUndo) {
       restore_state(&card, before);
-      (outcome == Outcome::kCorrect ? correct_total : wrong_total)--;
+      --tally.bucket_for(outcome);
       autosave(deck);
       log_undo(deck, card, answer_id, &log_warned);
       continue;  // same card, asked again
@@ -660,7 +685,7 @@ void review_flashcards(Deck& deck) {
   }
 
   clear_screen();
-  print_summary(correct_total, wrong_total,
+  print_summary(tally.correct, tally.partial, tally.wrong,
                 static_cast<int>(matches.size() - idx), deck, today_days);
 }
 }  // namespace FlashTerm

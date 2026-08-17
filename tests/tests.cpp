@@ -1,4 +1,6 @@
 // Minimal assert-style harness: no framework, just `make test`.
+#include <sys/stat.h>
+
 #include <clocale>
 #include <cstdio>
 #include <ctime>
@@ -18,6 +20,7 @@
 #include "schedule.h"
 #include "terminal.h"
 #include "text.h"
+#include "voice.h"
 
 using namespace FlashTerm;
 
@@ -472,6 +475,61 @@ void test_card_audio_column() {
   EXPECT_EQ(reparsed.audio, awkward.audio);
 }
 
+void test_voice_discovery() {
+  const std::string directory = temp_path("voices");
+  mkdir(directory.c_str(), 0755);
+  for (const char* name :
+       {"fr_FR-siwis-medium.onnx", "de_DE-thorsten-low.onnx",
+        "fr_FR-siwis-medium.onnx.json", "notes.txt"}) {
+    std::ofstream(directory + "/" + name) << "x\n";
+  }
+
+  // FLASHTERM_VOICES is searched first, but it adds to the usual places rather
+  // than replacing them -- so HOME has to move as well, or this test passes or
+  // fails depending on what the developer happens to have downloaded. That it
+  // did exactly that on the first run is the reason for saying so here.
+  const char* previous_home = std::getenv("HOME");
+  const std::string home = previous_home == nullptr ? "" : previous_home;
+  setenv("FLASHTERM_VOICES", directory.c_str(), 1);
+  setenv("HOME", temp_path("no-such-home").c_str(), 1);
+
+  const std::vector<std::string> found = voice::installed();
+  // Sorted, and only the models: a voice's .json config sits beside it and
+  // would otherwise be listed as a second voice with a confusing name.
+  EXPECT_EQ(found.size(), static_cast<std::size_t>(2));
+  EXPECT_EQ(found[0], std::string("de_DE-thorsten-low"));
+  EXPECT_EQ(found[1], std::string("fr_FR-siwis-medium"));
+
+  EXPECT_EQ(voice::model_path("fr_FR-siwis-medium"),
+            directory + "/fr_FR-siwis-medium.onnx");
+  EXPECT_EQ(voice::model_path("nl_NL-nobody-medium"), std::string(""));
+  EXPECT_EQ(voice::model_path(""), std::string(""));
+
+  // A path is taken as given, so a voice kept outside the searched
+  // directories does not have to be moved to be usable.
+  EXPECT_EQ(voice::model_path(directory + "/fr_FR-siwis-medium.onnx"),
+            directory + "/fr_FR-siwis-medium.onnx");
+  EXPECT_EQ(voice::model_path("/no/such/voice.onnx"), std::string(""));
+
+  // The command names the model by full path, so which directory it came from
+  // stops mattering the moment it is found.
+  const audio::Command command = voice::render_command("fr_FR-siwis-medium");
+  if (!command.empty()) {  // only when piper is actually installed
+    EXPECT_EQ(command[0], std::string("piper"));
+    EXPECT_EQ(command[2], directory + "/fr_FR-siwis-medium.onnx");
+    EXPECT_EQ(command.back(), std::string("{out}"));
+  }
+  // A voice that is not there never produces a command to run.
+  EXPECT_TRUE(voice::render_command("nl_NL-nobody-medium").empty());
+
+  unsetenv("FLASHTERM_VOICES");
+  if (home.empty()) {
+    unsetenv("HOME");
+  } else {
+    setenv("HOME", home.c_str(), 1);
+  }
+}
+
 void test_audio_path_resolution() {
   Flashcard card("Bonjour", "Hello");
   card.audio = "audio/bonjour.wav";
@@ -840,6 +898,32 @@ void test_cli_parsing() {
   EXPECT_TRUE(parse({"--", "--generate-audio"}).action == CliAction::RunDeck);
   EXPECT_EQ(parse({"--", "--generate-audio"}).deck_path,
             std::string("--generate-audio"));
+
+  // --voice takes a value, either way round, because someone shown one
+  // spelling will type the other.
+  EXPECT_EQ(parse({"--generate-audio", "--voice", "fr_FR-siwis-medium"}).voice,
+            std::string("fr_FR-siwis-medium"));
+  EXPECT_EQ(parse({"--generate-audio", "--voice=fr_FR-siwis-medium"}).voice,
+            std::string("fr_FR-siwis-medium"));
+  EXPECT_TRUE(parse({"--generate-audio", "--voice", "fr"}).action ==
+              CliAction::GenerateAudio);
+
+  // The voice must not be eaten as the deck path, and a deck given as well
+  // still lands where it should.
+  EXPECT_EQ(parse({"--generate-audio", "--voice", "fr", "d.txt"}).deck_path,
+            std::string("d.txt"));
+  EXPECT_EQ(parse({"--generate-audio", "--voice", "fr"}).deck_path,
+            std::string("default.txt"));
+
+  // A missing value is an error rather than a voice named "".
+  EXPECT_TRUE(parse({"--generate-audio", "--voice"}).action ==
+              CliAction::Error);
+  EXPECT_TRUE(parse({"--generate-audio", "--voice="}).action ==
+              CliAction::Error);
+
+  // Like --force, meaningless on its own and better said than ignored.
+  EXPECT_TRUE(parse({"--voice", "fr"}).action == CliAction::Error);
+  EXPECT_TRUE(parse({"d.txt", "--voice", "fr"}).action == CliAction::Error);
 
   // Errors and help both carry text worth printing.
   EXPECT_TRUE(!parse({"--nope"}).error.empty());
@@ -1512,6 +1596,7 @@ int main() {
   test_due_counts_and_next_due();
   test_card_csv();
   test_card_audio_column();
+  test_voice_discovery();
   test_audio_path_resolution();
   test_save_load_roundtrip();
   test_legacy_deck_migrates();

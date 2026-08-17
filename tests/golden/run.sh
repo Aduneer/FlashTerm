@@ -86,17 +86,21 @@ run_case() {
 
   # A case may add or override environment variables of its own, one KEY=VALUE
   # per line. It is how a case says "pretend this machine has no audio", which
-  # cannot be expressed by input alone.
+  # cannot be expressed by input alone. "{golden}" stands for this directory,
+  # so a case can put fakebin/ on the PATH without knowing where the checkout
+  # lives.
   case_env=
   if [ -f "$case_dir/env" ]; then
-    case_env=$(tr '\n' ' ' <"$case_dir/env")
+    case_env=$(sed "s|{golden}|$script_dir|g" "$case_dir/env" | tr '\n' ' ')
   fi
 
-  # A case testing recordings ships an audio/ directory beside its deck, so
-  # that the paths in the deck's audio column resolve to something real.
-  if [ -d "$case_dir/audio" ]; then
-    cp -R "$case_dir/audio" "$work_dir/audio"
-  fi
+  # Fixtures a case ships alongside its deck: recordings for the audio column
+  # to point at, and voice models for --voice to find.
+  for extra in audio voices; do
+    if [ -d "$case_dir/$extra" ]; then
+      cp -R "$case_dir/$extra" "$work_dir/$extra"
+    fi
+  done
 
   # The host's own settings must not reach the app: FLASHTERM_DECK in the
   # developer's shell would otherwise send every case at their real deck.
@@ -130,7 +134,8 @@ run_case() {
     echo '--- exit status ---'
     echo "$status"
     cd "$work_dir" && emit_files
-  } | awk -f "$script_dir/normalise.awk" >"$work_root/$name.transcript"
+  } | awk -v root="$root" -f "$script_dir/normalise.awk" \
+    >"$work_root/$name.transcript"
 
   if [ "$update" -eq 1 ]; then
     if [ -f "$case_dir/expected" ] &&

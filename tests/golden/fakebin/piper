@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Stands in for piper, so that the --voice path can be tested on a machine that
+# does not have it -- which includes CI, and includes anyone who has not gone
+# and installed it. Accepts the two arguments FlashTerm builds, "-m <model>" and
+# "-f <out>", and writes the text it was given on standard input to <out>, the
+# same way fake-audio.sh does for the FLASHTERM_TTS_RENDER path.
+
+out=
+model=
+while [ $# -gt 0 ]; do
+  case $1 in
+    -f) out=$2; shift 2 ;;
+    -m) model=$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+[ -n "$out" ] || exit 2
+cat >"$out"
+printf 'piper: %s  (%s)\n' "$out" "$(basename "$model")" >>played.txt

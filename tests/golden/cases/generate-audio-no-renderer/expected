@@ -1,15 +1,30 @@
 --- output ---
 Rendering audio for 1 card in deck.txt
-FlashTerm: FLASHTERM_TTS_RENDER is not set to a runnable command.
+FlashTerm: --generate-audio needs a voice.
 
-It names the synthesiser, with {out} for the file to write and the text arriving
-on standard input. For example:
+Name one with --voice, for example:
 
-  FLASHTERM_TTS_RENDER="piper -m fr_FR-siwis-medium -f {out}"
+  FlashTerm deck.txt --generate-audio --voice fr_FR-siwis-medium
+
+Or name the synthesiser yourself with FLASHTERM_TTS_RENDER, where {out} is
+the file to write and the text arrives on standard input:
+
   FLASHTERM_TTS_RENDER="espeak-ng -v fr --stdin -w {out}"
 
 There is no default because a voice implies a language, and guessing it would
 render a French deck in English.
+
+Installed voices:
+
+  de_DE-thorsten-medium
+  en_GB-alba-medium
+  es_ES-davefx-medium
+  fr_FR-siwis-medium
+  ja_JA-hi_fi_captain-medium
+
+Use one with:
+
+  FlashTerm deck.txt --generate-audio --voice de_DE-thorsten-medium
 --- exit status ---
 1
 --- file deck.txt ---

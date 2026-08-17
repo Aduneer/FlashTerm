@@ -1,0 +1,4 @@
+FLASHTERM_TTS_RENDER=
+PATH={golden}/fakebin:/usr/bin:/bin
+FLASHTERM_VOICES=voices
+HOME=.

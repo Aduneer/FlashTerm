@@ -1,0 +1,5 @@
+Bonjour,Hello,french;greeting
+Merci,Thanks|Thank you,french
+Au revoir,Goodbye,french
+Chat,Cat,french;animal
+Chien,Dog,french;animal

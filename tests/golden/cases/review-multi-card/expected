@@ -1,0 +1,160 @@
+--- output ---
+Loaded 5 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (5 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Review ---
+[1] Due now  (5 cards)
+[2] All cards
+[3] By tag
+[4] Difficult only  (incorrect > correct)
+[5] By Leitner box, weakest first
+[q] Back to the main menu
+> 
+--- Prompt Direction ---
+[Enter] Normal — question shown, you type the answer
+[r] Reversed — answer shown, you type the question
+> Progress: [████░░░░░░░░░░░░░░░░] 20% (1/5 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french                                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Merci                                                      │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+✅ Correct!
+Card promoted to Box 2!
+Next review in 3 days (<DATE1>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> Progress: [████████░░░░░░░░░░░░] 40% (2/5 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french;greeting                                │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Bonjour                                                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: Progress: [████████░░░░░░░░░░░░] 40% (2/5 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french;greeting                                │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Bonjour                                                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+Hint: H····
+[Enter] submit   [q] end session
+Your answer: 
+✅ Correct!
+Counted as a partial — the hint means this card stays where it is.
+Next review in 1 day (<DATE2>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> Progress: [████████████░░░░░░░░] 60% (3/5 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french                                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Au revoir                                                  │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+❌ Incorrect! Correct answer: Goodbye
+Next review in 1 day (<DATE2>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> Progress: [████████████████░░░░] 80% (4/5 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french;animal                                  │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Chat                                                       │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+✅ Correct!
+Card promoted to Box 2!
+Next review in 3 days (<DATE1>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> Progress: [████████████████████] 100% (5/5 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french;animal                                  │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Chien                                                      │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [?] hint   [q] end session
+Your answer: 
+✅ Correct!
+Card promoted to Box 2!
+Next review in 3 days (<DATE1>).
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+> ==================================================
+                 REVIEW COMPLETE                  
+==================================================
+  Correct:        3
+  Partial (hint): 1
+  Incorrect:      1
+  Total Reviewed: 5
+  Success Rate:   60.00%
+  Still Due:      0
+==================================================
+
+[any key] back to the main menu
+> 
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Bonjour,Hello,french;greeting,0,1,1,<DATE3>,<DATE2>,<ID1>
+Merci,Thanks|Thank you,french,1,0,2,<DATE3>,<DATE1>,<ID2>
+Au revoir,Goodbye,french,0,1,1,<DATE3>,<DATE2>,<ID3>
+Chat,Cat,french;animal,1,0,2,<DATE3>,<DATE1>,<ID4>
+Chien,Dog,french;animal,1,0,2,<DATE3>,<DATE1>,<ID5>
+--- file deck.txt.log ---
+<ID6>,<ID2>,<TIME>,n,correct,1,2,
+<ID7>,<ID1>,<TIME>,n,partial,1,1,
+<ID8>,<ID3>,<TIME>,n,incorrect,1,1,
+<ID9>,<ID4>,<TIME>,n,correct,1,2,
+<ID10>,<ID5>,<TIME>,n,correct,1,2,

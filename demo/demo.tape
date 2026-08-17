@@ -22,6 +22,11 @@ Set Shell "bash"
 # for the key legend that replaced its "press any key" line. A row is roughly
 # 23.5px at this font size, which is what to add per new line.
 #
+# 900px is about 89 columns, and the prompt after an answer is 103 once audio is
+# offered, so that legend wraps onto two lines here. That is deliberate and not
+# a defect to widen the canvas for: it is what an 80-column terminal does too,
+# and showing it is more honest than sizing the recording to hide it.
+#
 # The README displays this at width=640 to keep it from eating a whole screen of
 # scroll, so the extra native resolution is not wasted: it supersamples down
 # cleanly, and stays sharp on high-DPI displays where 640 CSS px is 1280 real

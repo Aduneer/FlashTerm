@@ -492,6 +492,8 @@ cannot drive an app that insists on a tty.
 
 Issues and pull requests are welcome. `make check` should pass before you open one; CI runs both suites on gcc and clang.
 
+Released versions and what changed in them are in [CHANGELOG.md](CHANGELOG.md).
+
 ## Credits
 
 FlashTerm has no dependencies and bundles no third-party code. It can, however,

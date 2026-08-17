@@ -142,6 +142,10 @@ std::vector<std::string> parse_csv_line(const std::string& line) {
   return fields;
 }
 
+std::size_t utf8_char_bytes(const std::string& str, std::size_t index) {
+  return char_bytes(str, index);
+}
+
 std::size_t display_width(const std::string& str) {
   std::size_t width = 0;
   for (std::size_t i = 0; i < str.size();) {
@@ -180,5 +184,72 @@ std::string pad_right(const std::string& str, std::size_t width) {
     return str;
   }
   return str + std::string(width - actual, ' ');
+}
+
+std::vector<std::string> wrap(const std::string& str, std::size_t width) {
+  std::vector<std::string> lines;
+  if (width == 0) return {str};
+
+  std::string line;         // the line being filled
+  std::size_t line_width = 0;
+  std::string word;         // the word being collected
+  std::size_t word_width = 0;
+
+  // Moves the pending word onto the current line, starting a new line first if
+  // it does not fit. A word wider than the whole column is broken instead.
+  auto flush_word = [&]() {
+    if (word.empty()) return;
+    if (line_width > 0 && line_width + 1 + word_width > width) {
+      lines.push_back(line);
+      line.clear();
+      line_width = 0;
+    }
+    if (line_width > 0) {
+      line += ' ';
+      ++line_width;
+    }
+    line += word;
+    line_width += word_width;
+    word.clear();
+    word_width = 0;
+  };
+
+  for (std::size_t i = 0; i < str.size();) {
+    if (str[i] == '\n') {
+      // An explicit newline is a break the text asked for, so it is kept.
+      flush_word();
+      lines.push_back(line);
+      line.clear();
+      line_width = 0;
+      ++i;
+      continue;
+    }
+    if (str[i] == ' ' || str[i] == '\t') {
+      flush_word();
+      ++i;
+      continue;
+    }
+
+    const std::size_t bytes = char_bytes(str, i);
+    const std::size_t glyph = char_width(str, i, bytes);
+
+    // The word alone already fills a line, so break it here rather than let it
+    // push past the frame.
+    if (word_width + glyph > width) {
+      flush_word();
+      if (line_width > 0) {
+        lines.push_back(line);
+        line.clear();
+        line_width = 0;
+      }
+    }
+    word.append(str, i, bytes);
+    word_width += glyph;
+    i += bytes;
+  }
+
+  flush_word();
+  lines.push_back(line);
+  return lines;
 }
 }  // namespace FlashTerm

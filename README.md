@@ -45,6 +45,7 @@ supported for staged installs if you are packaging FlashTerm.
 ./FlashTerm --version          # version
 
 export FLASHTERM_DECK=~/Sync/spanish.txt   # the deck to use when none is named
+export FLASHTERM_THEME=ocean               # default, ocean or sunset
 ```
 
 Your decks are yours: `flashcards.txt` and every `.log` are deliberately not
@@ -90,6 +91,11 @@ typed `init`.
 * **Works with the sync tool you already have** — Decks are plain text and saves are atomic, so Syncthing, Dropbox, `rsync` or git sync a deck between machines with no support needed from FlashTerm. See [Syncing Between Machines](#syncing-between-machines).
 * **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, automatic flagging of your hardest card, and how much you reviewed today alongside your current daily streak.
 * **Review log** — Every answer is appended to a `deck.txt.log` beside the deck: what was asked, which way round, whether you got it, and when, to the second. The card counters say what a card's state *is*; the log says what actually happened, which is what streaks, retention over time and merging two machines' reviews all need. It is append-only, so it never rewrites history and never conflicts.
+* **Single-keypress menus** — `2` enters review; no Enter, no waiting. Every screen that takes a key shows a legend of what the keys do. Guarded on `isatty`, so piped input still reads whole lines and every script, pipeline and recording keeps working unchanged. `Ctrl+C` at a menu saves and exits cleanly rather than killing the process.
+* **Framed cards** — The card under review is drawn in a box, centred in the window, with long questions wrapped to fit. Widths are measured in terminal columns rather than bytes, so the border still lines up on Japanese or accented cards — which is exactly where most tools get it wrong.
+* **Hints** — Stuck at a blank prompt, press `?` to reveal the first letter and the shape of the rest: `l·  ··········`. It counts as a *partial* — the card holds its box instead of advancing, since you produced the answer but not unaided.
+* **No dead ends** — `q` ends a review session from either prompt; leaving a card unanswered records nothing rather than counting it wrong. Every line prompt cancels on a bare Enter. Review keys are withheld on cards that accept them as answers, so a deck of vim keys or regex metacharacters stays reviewable.
+* **Themes** — `FLASHTERM_THEME=ocean` or `sunset` repaints the palette; `NO_COLOR` still wins over both.
 * **CSV parser** — Full double-quote support, so questions and answers can contain commas. Column layout is UTF-8 aware, so accented, CJK and emoji cards still line up.
 * **Crash-safe autosave** — The deck is written after every answered card and every edit, so `Ctrl+C` mid-session costs you nothing. Saves are atomic — written to a temporary file and renamed into place — and a deck that cannot be written says so loudly instead of failing silently.
 * **EOF and pipe safety** — Piped or non-interactive input auto-saves and exits cleanly rather than looping. Colour and screen clears are suppressed when output is not a terminal, or when `NO_COLOR` is set.
@@ -98,16 +104,56 @@ typed `init`.
 
 | Menu | What it does |
 | --- | --- |
-| 1. Add flashcard | Question, answer and semicolon-separated tags. Use `\|` for alternative answers. |
-| 2. Review flashcards | Pick a mode: **due** cards (most overdue first), **all** (shuffled), by **tag**, **difficult** only (incorrect > correct), or by **box**. Then pick a direction: Enter for normal, `r` to be shown the answer and type the question. |
-| 3. Manage flashcards | List, edit, delete or **find** cards. Editing and deleting ask for a search term first, so you never scroll a 200-card list to reach one card. Numbers shown are deck positions, and a card the search did not list cannot be edited or deleted by number. |
-| 4. Display progress | Deck statistics, due counts, reviews today, daily streak, box distribution, hardest card, per-card rates. |
-| 5. Import flashcards | Append cards from a `.csv` file. |
-| 6. Export flashcards | Write the deck to `.csv`, review history included, so it re-imports without losing progress. |
-| 7. List unique Tags | Every tag in the deck, sorted, with card counts. |
-| 0. Save and exit | Saves and exits. (The deck is already saved after every change.) |
+| `1` Add flashcard | Question, answer and semicolon-separated tags. Use `\|` for alternative answers. |
+| `2` Review flashcards | Pick a mode: **due** cards (most overdue first), **all** (shuffled), by **tag**, **difficult** only (incorrect > correct), or by **box**. Then pick a direction: Enter for normal, `r` to be shown the answer and type the question. |
+| `3` Manage flashcards | List, edit, delete or **find** cards. Editing and deleting ask for a search term first, so you never scroll a 200-card list to reach one card. Numbers shown are deck positions, and a card the search did not list cannot be edited or deleted by number. |
+| `4` Display progress | Deck statistics, due counts, reviews today, daily streak, box distribution, hardest card, per-card rates. |
+| `5` Import flashcards | Append cards from a `.csv` file. |
+| `6` Export flashcards | Write the deck to `.csv`, review history included, so it re-imports without losing progress. |
+| `7` List unique tags | Every tag in the deck, sorted, with card counts. |
+| `h` Help | The full key reference, including the review keys below. |
+| `0` Save and exit | Saves and exits. (The deck is already saved after every change.) |
 
-During a review, `u` undoes the last answer and `e` edits the current card.
+The menu is titled with the deck you are actually in, which matters once
+`FLASHTERM_DECK` means you might have several:
+
+```
+--- FlashTerm · spanish.txt ---
+[1] Add flashcard
+[2] Review flashcards  (2 due)
+...
+```
+
+Menu choices are a single keypress in a terminal — pressing `2` enters review
+immediately. When input is piped, menus read a whole line instead, so scripts
+are unaffected.
+
+Every screen that takes a key shows a legend of what those keys do, so nothing
+has to be memorised:
+
+```
+[Enter] submit   [?] hint   [q] end session
+Your answer: libary
+
+⚠  Close! The correct answer is: library
+   (You typed: libary)
+[y] mark it correct   [any other key] count it wrong
+> y
+✅ Marked as correct!
+Card promoted to Box 3!
+
+[Enter] next card   [e] edit this card   [u] undo this answer   [q] end session
+>
+```
+
+`q` leaves a session at any point — from the answer prompt, which leaves the
+card unanswered rather than marking it wrong, or after answering. Either way
+you get the summary for how far you got, with a count of what you did not
+reach. Every prompt that takes a whole line cancels on a bare Enter, so no
+screen is a dead end.
+
+Menu option `h` prints the same keys as a reference, including `Ctrl+C` to save
+and exit.
 
 ## Deck File Format
 
@@ -142,10 +188,11 @@ c9072b87405e0369,2fb76783d6b65f93,2026-08-17T09:50:49Z,n,correct,1,2,
   order regardless of timezone. Due dates stay whole days; only the log is
   finer-grained than that.
 * `direction` is `n` for a normal prompt and `r` for a reversed one.
-* `result` is `correct`, `incorrect`, or `undo`. An answer you take back with
-  `u` is *recorded* as undone rather than erased — a line that may already have
-  been synced elsewhere cannot be unwritten — and undone answers are excluded
-  from every statistic.
+* `result` is `correct`, `partial`, `incorrect`, or `undo`. A `partial` is an
+  answer that needed the hint. An answer you take back with `u` is *recorded*
+  as undone rather than erased — a line that may already have been synced
+  elsewhere cannot be unwritten — and undone answers are excluded from every
+  statistic.
 
 Losing or deleting the log costs you the history, not the deck: cards keep
 their own counters and schedule.
@@ -211,7 +258,8 @@ the scheduling logic (calendar arithmetic, leap years, box intervals, due
 dates), the `Deck` persistence layer (atomic writes, write failures, lossless
 import/export, legacy-deck migration, statistics), the review log (event
 round-trips, damaged lines, card ids, streaks, and merging and replaying two
-machines' logs), and command-line and environment handling.
+machines' logs), text layout (column-accurate word wrapping), and command-line
+and environment handling.
 
 ### Project Layout
 

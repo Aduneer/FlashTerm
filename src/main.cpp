@@ -9,6 +9,7 @@
 #include "deck.h"
 #include "review.h"
 #include "terminal.h"
+#include "text.h"
 #include "ui.h"
 
 using namespace FlashTerm;
@@ -16,26 +17,55 @@ using namespace FlashTerm;
 namespace {
 const char kDefaultDeck[] = "flashcards.txt";
 
+// The deck's own name in the title, because studying more than one deck is the
+// normal case once FLASHTERM_DECK exists and "which deck am I in" should not
+// need a guess.
+std::string deck_title(const Deck& deck) {
+  const std::string& path = deck.path();
+  const std::size_t slash = path.find_last_of('/');
+  const std::string name =
+      (slash == std::string::npos) ? path : path.substr(slash + 1);
+  return "FlashTerm · " + name;
+}
+
 void print_main_menu(const Deck& deck) {
   const int due = deck.due_count(today());
-  std::cout << color::cyan << "1. Add flashcard\n"
-            << "2. Review flashcards";
+  std::string review = "Review flashcards";
   if (due > 0) {
-    std::cout << color::yellow << "  (" << due << " due)" << color::cyan;
+    review += std::string(color::yellow) + "  (" + std::to_string(due) +
+              " due)" + color::reset;
   }
-  std::cout << "\n"
-            << "3. Manage flashcards\n"
-            << "4. Display progress\n"
-            << "5. Import flashcards\n"
-            << "6. Export flashcards\n"
-            << "7. List unique Tags\n"
-            << color::reset << color::yellow << "0. Save and exit\n"
-            << "h/? Help\n"
-            << "Choose: " << color::reset;
+
+  print_menu(deck_title(deck), {{"1", "Add flashcard"},
+                                {"2", review},
+                                {"3", "Manage flashcards"},
+                                {"4", "Display progress"},
+                                {"5", "Import flashcards"},
+                                {"6", "Export flashcards"},
+                                {"7", "List unique tags"},
+                                {"h", "Help"},
+                                {"0", "Save and exit"}});
+  print_prompt();
+}
+
+// Empty means "changed my mind": a menu you cannot back out of is a trap, and
+// trying to open a file called "" only produces a confusing error.
+std::string ask_for_path(const char* purpose) {
+  std::cout << color::cyan << "\n--- " << purpose << " ---\n"
+            << color::reset << "Path to the file, or Enter to cancel.\n";
+  print_prompt();
+  std::string path;
+  read_line(path);
+  return trim(path);
 }
 
 void run_import(Deck& deck) {
-  const std::string path = prompt("Enter import file path: ");
+  const std::string path = ask_for_path("Import Flashcards");
+  if (path.empty()) {
+    std::cout << color::yellow << "Import cancelled.\n\n" << color::reset;
+    return;
+  }
+
   const ImportResult result = import_into(deck, path);
   if (!result.ok) {
     std::cout << color::red << "Import failed: " << result.error << "\n\n"
@@ -48,7 +78,12 @@ void run_import(Deck& deck) {
 }
 
 void run_export(const Deck& deck) {
-  const std::string path = prompt("Enter export file path: ");
+  const std::string path = ask_for_path("Export Flashcards");
+  if (path.empty()) {
+    std::cout << color::yellow << "Export cancelled.\n\n" << color::reset;
+    return;
+  }
+
   std::string error;
   if (!export_deck(deck, path, &error)) {
     std::cout << color::red << "Export failed: " << error << "\n\n"
@@ -93,8 +128,7 @@ int main(int argc, char* argv[]) {
   try {
     while (true) {
       print_main_menu(deck);
-      std::string input;
-      read_line(input);
+      const std::string input = read_choice();
       clear_screen();
 
       if (input == "1") {

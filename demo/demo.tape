@@ -14,10 +14,13 @@
 Output demo/demo.gif
 
 Set Shell "bash"
-# 900x770 at FontSize 16 fits the statistics dashboard, which is the tallest
-# screen at 31 lines. Anything shorter clips its title off the top. It grew by
-# two when the review log added "Reviewed Today" and "Current Streak" to it, so
-# re-measure this if anything else is ever added to that screen.
+# 900x795 at FontSize 16 fits the statistics dashboard, which is the tallest
+# screen at 32 lines. Anything shorter clips its title off the top.
+#
+# Re-measure whenever a line is added to that screen: it has already grown
+# twice, once for the log's "Reviewed Today" and "Current Streak", and once
+# for the key legend that replaced its "press any key" line. A row is roughly
+# 23.5px at this font size, which is what to add per new line.
 #
 # The README displays this at width=640 to keep it from eating a whole screen of
 # scroll, so the extra native resolution is not wasted: it supersamples down
@@ -29,7 +32,7 @@ Set Shell "bash"
 # progress bars and the sheer volume of distinct text, not the frame count.
 Set FontSize 16
 Set Width 900
-Set Height 770
+Set Height 795
 Set Padding 20
 Set Theme "Dracula"
 Set TypingSpeed 75ms
@@ -47,15 +50,19 @@ Type "./FlashTerm spanish.txt"
 Sleep 600ms
 Enter
 
+# Menus take a single keypress, so there is deliberately no Enter after a menu
+# digit below: typing one is what selects it. Only the prompts that accept a
+# whole line -- typed answers, and the tag filter -- still need Enter, and
+# those are the ones that keep it. Get this wrong and the stray Return falls
+# through to whatever screen comes next.
+
 # The main menu reports how many cards are actually due.
 Sleep 2s
 Type "2"
-Enter
 Sleep 2s
 
 # Drill exactly what is due, most overdue first.
 Type "1"
-Enter
 Sleep 2s
 
 # Enter keeps the normal direction: question shown, answer typed.
@@ -68,7 +75,6 @@ Sleep 700ms
 Enter
 Sleep 2.5s
 Type "y"
-Enter
 Sleep 2.5s
 Enter
 Sleep 1.2s
@@ -88,7 +94,6 @@ Sleep 1.2s
 
 # The statistics dashboard.
 Type "4"
-Enter
 Sleep 4.5s
 Enter
 Sleep 1.5s
@@ -96,18 +101,24 @@ Sleep 1.5s
 # Reversed review, scoped with a tag filter: shown the English, produce the
 # Spanish. "places" matches only "la ciudad", so this stays a single card.
 Type "2"
-Enter
 Sleep 1.5s
 Type "3"
-Enter
 Sleep 2.5s
+# The tag filter takes names or numbers, so it reads a whole line and keeps its
+# Enter.
 Type "1"
 Enter
 Sleep 1.5s
 Type "r"
+Sleep 3s
+
+# Stuck on the reversed prompt, so ask for a hint: the first letter and the
+# shape of the rest. It counts as a partial, which holds the card's box rather
+# than advancing it.
+Type "?"
 Enter
 Sleep 3s
 Type "la ciudad"
 Sleep 500ms
 Enter
-Sleep 3s
+Sleep 3.5s

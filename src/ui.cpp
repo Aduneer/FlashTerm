@@ -50,6 +50,56 @@ std::string prompt(const std::string& message) {
   return input;
 }
 
+std::string read_choice() {
+  if (!interactive()) {
+    std::string line;
+    read_line(line);
+    return trim(line);
+  }
+
+  // std::cout is line-buffered to a terminal, and read_key() reads the file
+  // descriptor directly rather than through the stream layer, so nothing
+  // flushes on its behalf the way std::cin does for read_line. Without this,
+  // every prompt that does not end in a newline — which is all of them, since
+  // the cursor is meant to sit after "Choose: " — stays invisible in the
+  // buffer while the app blocks waiting for the key it just asked for.
+  std::cout << std::flush;
+
+  const int key = read_key();
+  if (key == kEndOfInput) {
+    throw std::runtime_error("end of input");
+  }
+  // Raw mode suppressed the echo, so the keystroke is printed here instead.
+  // Without this the menu would silently jump and leave no record of what was
+  // pressed in the scrollback.
+  if (key == '\r' || key == '\n') {
+    std::cout << "\n" << std::flush;
+    return "";
+  }
+  std::cout << static_cast<char>(key) << "\n" << std::flush;
+  return std::string(1, static_cast<char>(key));
+}
+
+std::string legend(const std::vector<KeyHint>& hints) {
+  std::string out;
+  for (const auto& hint : hints) {
+    if (!out.empty()) out += "   ";
+    out += std::string(color::cyan) + "[" + hint.key + "]" + color::reset + " " +
+           hint.action;
+  }
+  return out;
+}
+
+void print_menu(const std::string& title, const std::vector<MenuItem>& items) {
+  std::cout << color::cyan << "\n--- " << title << " ---\n" << color::reset;
+  for (const auto& item : items) {
+    std::cout << color::cyan << "[" << item.key << "]" << color::reset << " "
+              << item.label << "\n";
+  }
+}
+
+void print_prompt() { std::cout << color::yellow << "> " << color::reset; }
+
 int read_int() {
   std::string input;
   read_line(input);
@@ -70,11 +120,16 @@ void autosave(const Deck& deck) {
 }
 
 void add_flashcard(Deck& deck) {
-  std::cout << color::yellow << "Enter question (or 'q' to go back): "
-            << color::reset;
+  std::cout << color::cyan << "\n--- Add a Flashcard ---\n"
+            << color::reset << "Question, or Enter to cancel.\n";
+  print_prompt();
   std::string question;
   read_line(question);
-  if (question == "q" || question == "Q") {
+  // Enter on its own backs out, matching every other prompt that takes a whole
+  // line. "q" still works, because it used to be the only way out and someone
+  // will have it in their fingers.
+  if (trim(question).empty() || to_lowercase(trim(question)) == "q") {
+    std::cout << color::yellow << "Cancelled.\n\n" << color::reset;
     return;
   }
 
@@ -207,15 +262,13 @@ void find_flashcards(const Deck& deck) { list_matching(deck); }
 
 void manage_flashcards(Deck& deck) {
   while (true) {
-    std::cout << color::cyan << "--- Managing Options ---\n"
-              << "1. List flashcards\n"
-              << "2. Edit a flashcard\n"
-              << "3. Delete a flashcard\n"
-              << "4. Find flashcards\n"
-              << color::yellow << "q. Return to main menu\n"
-              << "Choose: " << color::reset;
-    std::string choice;
-    read_line(choice);
+    print_menu("Manage Flashcards", {{"1", "List flashcards"},
+                                     {"2", "Edit a flashcard"},
+                                     {"3", "Delete a flashcard"},
+                                     {"4", "Find flashcards"},
+                                     {"q", "Back to the main menu"}});
+    print_prompt();
+    const std::string choice = read_choice();
     clear_screen();
 
     if (choice == "1") {
@@ -359,16 +412,18 @@ void display_progress(const Deck& deck) {
               << describe_due_short(card.due_date, today_days) << "\n";
   }
 
-  std::cout << "\nPress Enter to return to main menu...";
-  std::string discard;
-  read_line(discard);
+  std::cout << "\n" << legend({{"any key", "back to the main menu"}}) << "\n";
+  print_prompt();
+  read_choice();
   clear_screen();
 }
 
 void print_help() {
   std::cout
-      << color::yellow
-      << "Commands:\n"
+      << color::cyan << "Menu\n"
+      << color::reset
+      << "  Menu choices take a single keypress — no Enter. Typed answers,\n"
+         "  searches and file paths still read a whole line.\n"
          "1 - Add flashcard\n"
          "2 - Review flashcards (Due now, All, by Tags, by Difficulty, or by "
          "Leitner Box)\n"
@@ -379,6 +434,20 @@ void print_help() {
          "7 - Manage Tags (list all unique tags)\n"
          "0 - Save and exit\n"
          "h/? - Show this help screen\n"
-      << color::reset << "\n";
+      << color::cyan << "\nAt the answer prompt\n"
+      << color::reset << "  "
+      << legend({{"?", "hint — reveals the first letter; counts as a partial"}})
+      << "\n  " << legend({{"q", "end the session and go back to the menu"}})
+      << "\n  Both are ignored on a card that accepts them as answers, so a\n"
+         "  deck of vim keys or regex metacharacters still works.\n"
+      << color::cyan << "\nAfter answering\n"
+      << color::reset << "  " << legend({{"Enter", "next card"}})
+      << "\n  " << legend({{"e", "edit the card you are looking at"}})
+      << "\n  " << legend({{"u", "undo the answer you just gave"}})
+      << "\n  " << legend({{"q", "end the session and go back to the menu"}})
+      << color::cyan << "\n\nAnywhere\n"
+      << color::reset << "  " << legend({{"Ctrl+C", "save and exit"}})
+      << "\n  Nothing is ever lost by leaving: the deck is saved after every\n"
+         "  answer and every edit.\n\n";
 }
 }  // namespace FlashTerm

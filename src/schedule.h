@@ -21,9 +21,23 @@ struct AnswerResult {
   int due_date = 0;
 };
 
+// How well the card was answered.
+//
+// kPartial is what a hinted answer earns: you did produce the answer, so it is
+// not the same as failing outright, but you did not produce it unaided, so it
+// has not earned a longer interval either. It therefore holds the box still
+// rather than promoting or demoting, and counts against the success rate.
+enum class Outcome {
+  kCorrect,
+  kPartial,
+  kIncorrect,
+};
+
 // Applies the Leitner move and the resulting schedule: a correct answer
-// promotes one box, a wrong answer drops the card straight back to box 1.
-AnswerResult record_answer(Flashcard* card, bool correct, int today_days);
+// promotes one box, a wrong answer drops the card straight back to box 1, and
+// a partial one leaves it where it is. Either way the card is rescheduled from
+// today by whatever box it ends up in.
+AnswerResult record_answer(Flashcard* card, Outcome outcome, int today_days);
 
 // Everything record_answer touches, so an answer can be taken back exactly.
 struct CardState {

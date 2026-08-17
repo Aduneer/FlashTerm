@@ -137,8 +137,14 @@ int local_day_of(const std::string& timestamp) {
 }
 
 std::string event_to_csv(const ReviewEvent& event) {
-  const std::string result =
-      event.is_undo() ? "undo" : (event.correct ? "correct" : "incorrect");
+  std::string result = "undo";
+  if (!event.is_undo()) {
+    switch (event.outcome) {
+      case Outcome::kCorrect: result = "correct"; break;
+      case Outcome::kPartial: result = "partial"; break;
+      case Outcome::kIncorrect: result = "incorrect"; break;
+    }
+  }
   return escape_csv_field(event.id) + "," + escape_csv_field(event.card_id) +
          "," + escape_csv_field(event.timestamp) + "," +
          std::string(1, event.direction) + "," + result + "," +
@@ -161,7 +167,11 @@ bool event_from_csv(const std::string& line, ReviewEvent* out) {
   event.direction = (direction == "r") ? 'r' : 'n';
 
   const std::string result = to_lowercase(trim(fields[4]));
-  event.correct = (result == "correct");
+  // Anything unrecognised is read as a failed answer rather than rejected: a
+  // future version's richer outcome still counts as a review that happened.
+  event.outcome = (result == "correct")   ? Outcome::kCorrect
+                  : (result == "partial") ? Outcome::kPartial
+                                          : Outcome::kIncorrect;
   event.box_before = clamp_box(parse_int_or(fields, 5, 1));
   event.box_after = clamp_box(parse_int_or(fields, 6, 1));
   event.undoes = field_or_empty(fields, 7);
@@ -257,7 +267,9 @@ std::map<std::string, CardState> replay(
     if (event.is_undo() || undone.count(event.id) > 0) continue;
 
     CardState& state = states[event.card_id];
-    if (event.correct) {
+    // A partial counts against the score exactly as record_answer scores it;
+    // what makes it different is the box, and the box is carried by the event.
+    if (event.outcome == Outcome::kCorrect) {
       ++state.times_correct;
     } else {
       ++state.times_incorrect;
@@ -289,7 +301,8 @@ LogStats summarize(const std::vector<ReviewEvent>& events, int today_days) {
 
     if (day == today_days) {
       ++stats.reviewed_today;
-      if (event.correct) ++stats.correct_today;
+      if (event.outcome == Outcome::kCorrect) ++stats.correct_today;
+      if (event.outcome == Outcome::kPartial) ++stats.hinted_today;
     }
   }
 

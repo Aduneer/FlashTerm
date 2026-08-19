@@ -14,3 +14,9 @@
 
 # Review logs, which sit beside whichever deck file they belong to.
 *.log
+
+# ...except the ones the golden tests ship as fixtures. Those are not study
+# data, they are the input a transcript is checked against, and a case whose
+# log is missing fails on a fresh clone while passing on the machine that
+# wrote it.
+!/tests/golden/cases/*/files/*.log

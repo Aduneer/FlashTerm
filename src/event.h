@@ -91,6 +91,18 @@ class EventLog {
   // is kept in memory regardless: failing to log must never cost a review.
   bool append(const ReviewEvent& event, std::string* error = nullptr);
 
+  // Replaces the whole file with `events`, and the in-memory list with it.
+  // Written to a temporary file and renamed into place, exactly as Deck::save
+  // does, because unlike an append this one can leave a half-written log
+  // behind and the log is the only copy of what actually happened.
+  //
+  // Appending is how a log normally grows; this exists for the one operation
+  // that legitimately rewrites lines already on disk -- absorbing another
+  // machine's copy, whose events interleave with this one's rather than
+  // following them.
+  bool rewrite(const std::vector<ReviewEvent>& events,
+               std::string* error = nullptr);
+
  private:
   std::string path_;
   std::vector<ReviewEvent> events_;
@@ -100,8 +112,7 @@ class EventLog {
 // machines' logs become one, and ordering by a field both sides agree on makes
 // the result independent of which log was merged into which.
 //
-// Not yet called by the application: it is the half of file-based sync that
-// has to exist before syncing can be more than "last writer wins".
+// Called by --absorb-conflicts; see sync.h.
 std::vector<ReviewEvent> merge_events(const std::vector<ReviewEvent>& a,
                                       const std::vector<ReviewEvent>& b);
 
@@ -110,10 +121,13 @@ std::vector<ReviewEvent> merge_events(const std::vector<ReviewEvent>& a,
 // result even though it stays visible in the log.
 //
 // This is the function that makes the counters a derived cache rather than the
-// source of truth. It is deliberately not wired into Deck::load() yet: the
-// counters in an existing deck have no events behind them, so replaying today
-// would report every deck as brand new. Sync is where this gets turned on,
-// against a log that covers the whole history.
+// source of truth. It is still not wired into Deck::load(), and for the same
+// reason as before: the counters in an existing deck have no events behind
+// them, so replaying on load would report every deck as brand new.
+// --absorb-conflicts uses it differentially instead -- replaying the log
+// before and after a merge and applying only what changed -- so that a deck
+// gains what the other machine did without losing what predates the log. See
+// sync.h.
 std::map<std::string, CardState> replay(const std::vector<ReviewEvent>& events);
 
 struct LogStats {

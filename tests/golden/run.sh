@@ -16,8 +16,9 @@
 # that way: a golden test cannot drive an app that insists on a tty.
 #
 # A case is a directory under cases/ holding an `input` file and, optionally, a
-# starting `deck.txt`, an `args` file, an `env` file of KEY=VALUE lines, and an
-# `audio/` directory of recordings for the deck's audio column to point at.
+# starting `deck.txt`, an `args` file, an `env` file of KEY=VALUE lines, an
+# `audio/` directory of recordings for the deck's audio column to point at, and
+# a `files/` directory whose contents are copied in as they are.
 #
 # Usage:
 #   tests/golden/run.sh                 run every case
@@ -101,6 +102,14 @@ run_case() {
       cp -R "$case_dir/$extra" "$work_dir/$extra"
     fi
   done
+
+  # Anything else the case wants in the working directory, copied in by
+  # content rather than as a named directory. What needs it: a review log and
+  # the sync-conflict copies beside it, whose names are the sync client's
+  # invention and so cannot be a fixed fixture name like the two above.
+  if [ -d "$case_dir/files" ]; then
+    cp -R "$case_dir/files/." "$work_dir/"
+  fi
 
   # The host's own settings must not reach the app: FLASHTERM_DECK in the
   # developer's shell would otherwise send every case at their real deck.

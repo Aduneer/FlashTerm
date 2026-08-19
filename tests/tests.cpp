@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,7 @@
 #include "event.h"
 #include "review.h"
 #include "schedule.h"
+#include "sync.h"
 #include "terminal.h"
 #include "text.h"
 #include "ui.h"
@@ -954,6 +956,30 @@ void test_cli_parsing() {
   EXPECT_TRUE(parse({"--generate-audio", "--force", "fr.txt"}).force);
   EXPECT_TRUE(parse({"fr.txt", "--force", "--generate-audio"}).force);
 
+  // --absorb-conflicts behaves the same way: about a deck, so the rest of the
+  // command line still counts.
+  EXPECT_TRUE(parse({"--absorb-conflicts"}).action == CliAction::AbsorbConflicts);
+  EXPECT_EQ(parse({"--absorb-conflicts"}).deck_path, std::string("default.txt"));
+  EXPECT_EQ(parse({"es.txt", "--absorb-conflicts"}).deck_path,
+            std::string("es.txt"));
+  EXPECT_EQ(parse({"--absorb-conflicts", "es.txt"}).deck_path,
+            std::string("es.txt"));
+  EXPECT_TRUE(parse({"--", "--absorb-conflicts"}).action == CliAction::RunDeck);
+
+  // Two modes is not a request that can be honoured, and taking the last one
+  // would silently skip whichever was typed first.
+  EXPECT_TRUE(parse({"--generate-audio", "--absorb-conflicts"}).action ==
+              CliAction::Error);
+  EXPECT_TRUE(parse({"--absorb-conflicts", "--generate-audio"}).action ==
+              CliAction::Error);
+
+  // --force and --voice belong to --generate-audio, and saying so beats
+  // accepting them and doing nothing with them.
+  EXPECT_TRUE(parse({"--absorb-conflicts", "--force"}).action ==
+              CliAction::Error);
+  EXPECT_TRUE(parse({"--absorb-conflicts", "--voice", "fr"}).action ==
+              CliAction::Error);
+
   // --force alone would silently do nothing, and the obvious misreading is
   // that it forces something about a review.
   EXPECT_TRUE(parse({"--force"}).action == CliAction::Error);
@@ -1328,6 +1354,279 @@ void test_replay() {
   EXPECT_TRUE(replay({}).empty());
 }
 
+void write_file(const std::string& path, const std::string& contents) {
+  std::ofstream file(path);
+  file << contents;
+}
+
+std::string events_as_log(const std::vector<ReviewEvent>& events) {
+  std::string text;
+  for (const auto& event : events) text += event_to_csv(event) + "\n";
+  return text;
+}
+
+void test_is_conflict_copy() {
+  const std::string log = "spanish.txt.log";
+
+  // Syncthing and Dropbox both insert their marker before the extension, which
+  // is the shape most people never actually look at closely enough to notice.
+  EXPECT_TRUE(is_conflict_copy(
+      log, "spanish.txt.sync-conflict-20260818-101112-K3JQ7ZP.log"));
+  EXPECT_TRUE(
+      is_conflict_copy(log, "spanish.txt (laptop's conflicted copy 2026-08-18).log"));
+  EXPECT_TRUE(is_conflict_copy(log, "spanish.txt_conflict-20260818-101112.log"));
+  // And the plainly appended shape, which is what it is usually remembered as.
+  EXPECT_TRUE(is_conflict_copy(
+      log, "spanish.txt.log.sync-conflict-20260818-101112-K3JQ7ZP"));
+  // Case is the sync client's business, not ours.
+  EXPECT_TRUE(is_conflict_copy(log, "spanish.txt.Sync-Conflict-20260818.log"));
+
+  // The log itself is not a copy of the log.
+  EXPECT_TRUE(!is_conflict_copy(log, log));
+  EXPECT_TRUE(!is_conflict_copy(log, "spanish.txt"));
+  // Files that sit beside it and are emphatically not another machine's
+  // history. The .tmp is the one that matters: an interrupted rewrite leaves
+  // one, and absorbing it would be circular.
+  EXPECT_TRUE(!is_conflict_copy(log, "spanish.txt.log.bak"));
+  EXPECT_TRUE(!is_conflict_copy(log, "spanish.txt.log.tmp"));
+  EXPECT_TRUE(!is_conflict_copy(log, "spanish.txt.log~"));
+  // Another deck's conflict copy, in the same synced directory.
+  EXPECT_TRUE(!is_conflict_copy(
+      log, "french.txt.sync-conflict-20260818-101112-K3JQ7ZP.log"));
+  // The deck's own conflict copy. Deck lines genuinely do conflict, and this
+  // feature has nothing to say about them.
+  EXPECT_TRUE(!is_conflict_copy(
+      log, "spanish.sync-conflict-20260818-101112-K3JQ7ZP.txt"));
+}
+
+void test_find_conflict_copies() {
+  const std::string dir = temp_path("conflicts");
+  mkdir(dir.c_str(), 0755);
+  const std::string log = dir + "/deck.txt.log";
+  const std::string first = dir + "/deck.txt.sync-conflict-20260818-090000-AAA.log";
+  const std::string second = dir + "/deck.txt.sync-conflict-20260818-100000-BBB.log";
+  const std::string decoy = dir + "/deck.txt.log.bak";
+  for (const auto& path : {log, first, second, decoy}) {
+    std::remove(path.c_str());
+  }
+
+  write_file(log, "");
+  EXPECT_TRUE(find_conflict_copies(log).empty());
+
+  write_file(second, "");
+  write_file(first, "");
+  write_file(decoy, "");
+  const std::vector<std::string> found = find_conflict_copies(log);
+  EXPECT_EQ(found.size(), size_t{2});
+  // Name order, not whatever order the filesystem hands them back in: the run
+  // has to produce the same thing twice.
+  EXPECT_EQ(found[0], first);
+  EXPECT_EQ(found[1], second);
+
+  // A log in the working directory rather than a named one still finds its
+  // copies, which is the split-path case that has no slash to split on.
+  EXPECT_TRUE(find_conflict_copies("no-such-directory/deck.txt.log").empty());
+
+  for (const auto& path : {log, first, second, decoy}) {
+    std::remove(path.c_str());
+  }
+}
+
+void test_event_log_rewrite() {
+  const std::string path = temp_path("rewrite.log");
+  std::remove(path.c_str());
+
+  EventLog log(path);
+  EXPECT_TRUE(log.append(answer_event("card1", "2026-08-18T09:00:00Z", true, 1, 2)));
+
+  std::vector<ReviewEvent> replacement;
+  replacement.push_back(answer_event("card1", "2026-08-17T09:00:00Z", true, 1, 2));
+  replacement.push_back(log.events()[0]);
+  EXPECT_TRUE(log.rewrite(replacement));
+  EXPECT_EQ(log.events().size(), size_t{2});
+
+  // On disk as well as in memory, and in the order it was given.
+  EventLog reloaded(path);
+  EXPECT_TRUE(reloaded.load());
+  EXPECT_EQ(reloaded.events().size(), size_t{2});
+  EXPECT_EQ(reloaded.events()[0].timestamp, std::string("2026-08-17T09:00:00Z"));
+
+  // A rewrite that cannot be written leaves the object describing what is
+  // still on disk, rather than what was meant to replace it.
+  EventLog unwritable(temp_path("no-such-dir/rewrite.log"));
+  std::string error;
+  EXPECT_TRUE(!unwritable.rewrite(replacement, &error));
+  EXPECT_TRUE(!error.empty());
+  EXPECT_TRUE(unwritable.empty());
+
+  std::remove(path.c_str());
+}
+
+void test_absorb_conflicts() {
+  const std::string dir = temp_path("absorb");
+  mkdir(dir.c_str(), 0755);
+  const std::string deck_path = dir + "/deck.txt";
+  const std::string log_path = log_path_for(deck_path);
+  const std::string copy_path =
+      dir + "/deck.txt.sync-conflict-20260818-101112-K3JQ7ZP.log";
+  for (const auto& path : {deck_path, log_path, copy_path}) {
+    std::remove(path.c_str());
+  }
+
+  const int day = days_from_civil(2026, 8, 18);
+  const std::string one = "card0000000000001";
+  const std::string two = "card0000000000002";
+  const std::string three = "card0000000000003";
+
+  // What both machines already had.
+  const ReviewEvent shared = answer_event(one, stamp_on_day(day - 1, 9), true, 1, 2);
+  // What the other machine did while this one was offline.
+  const ReviewEvent later = answer_event(one, stamp_on_day(day, 9), true, 2, 3);
+  const ReviewEvent elsewhere = answer_event(two, stamp_on_day(day, 10), false, 1, 1);
+  // A card this deck has not received yet -- the deck and the log sync
+  // separately, so one can arrive first.
+  const ReviewEvent stranger =
+      answer_event("card0000000000009", stamp_on_day(day, 11), true, 1, 2);
+
+  // "el gato" is the card the whole differential design exists for: counters
+  // from before the log, with no events anywhere behind them.
+  write_file(deck_path,
+             "el perro,the dog,,1,0,2," + format_date(day - 1) + "," +
+                 format_date(day) + "," + one + "\n" +
+                 "la casa,the house,,0,0,1,,," + two + "\n" +
+                 "el gato,the cat,,3,1,3," + format_date(day - 5) + "," +
+                 format_date(day + 2) + "," + three + "\n");
+  write_file(log_path, events_as_log({shared}));
+  write_file(copy_path, events_as_log({shared, later, elsewhere, stranger}));
+
+  Deck deck(deck_path);
+  EXPECT_TRUE(deck.load());
+  std::ostringstream out;
+  std::ostringstream errors;
+  const AbsorbResult result = absorb_conflicts(deck, out, errors);
+
+  EXPECT_TRUE(!result.failed);
+  EXPECT_EQ(result.exit_code(), 0);
+  EXPECT_EQ(result.copies, 1);
+  // Three of the copy's four events were new; the shared one is a union, not
+  // a duplicate.
+  EXPECT_EQ(result.absorbed, 3);
+  EXPECT_EQ(result.cards_updated, 2);
+  EXPECT_EQ(result.unknown_cards, 1);
+  EXPECT_TRUE(errors.str().empty());
+
+  Deck reloaded(deck_path);
+  EXPECT_TRUE(reloaded.load());
+  EXPECT_EQ(reloaded.log().events().size(), size_t{4});
+
+  // The card the other machine reviewed again: one more correct answer on top
+  // of what this deck already counted, and the schedule that follows from it.
+  const Flashcard& perro = reloaded.cards()[0];
+  EXPECT_EQ(perro.times_correct, 2);
+  EXPECT_EQ(perro.times_incorrect, 0);
+  EXPECT_EQ(perro.leitner_box, 3);
+  EXPECT_EQ(perro.last_reviewed, day);
+  EXPECT_EQ(perro.due_date, day + interval_for_box(3));
+
+  // A card this machine had never reviewed picks up the other machine's
+  // answer and its schedule from nothing.
+  const Flashcard& casa = reloaded.cards()[1];
+  EXPECT_EQ(casa.times_incorrect, 1);
+  EXPECT_EQ(casa.leitner_box, 1);
+  EXPECT_EQ(casa.due_date, day + interval_for_box(1));
+
+  // The point of replaying twice and applying the difference: a card whose
+  // history predates the log is not reset to what the log can prove.
+  const Flashcard& gato = reloaded.cards()[2];
+  EXPECT_EQ(gato.times_correct, 3);
+  EXPECT_EQ(gato.times_incorrect, 1);
+  EXPECT_EQ(gato.leitner_box, 3);
+  EXPECT_EQ(gato.due_date, day + 2);
+
+  // The copy is read, not consumed.
+  std::ifstream still_there(copy_path);
+  EXPECT_TRUE(still_there.good());
+
+  // And absorbing again is a no-op, which is what makes leaving the copy in
+  // place harmless.
+  Deck second(deck_path);
+  EXPECT_TRUE(second.load());
+  std::ostringstream second_out;
+  const AbsorbResult again = absorb_conflicts(second, second_out, errors);
+  EXPECT_EQ(again.absorbed, 0);
+  EXPECT_EQ(again.cards_updated, 0);
+  EXPECT_TRUE(!again.failed);
+
+  // Nothing to absorb is not a failure either.
+  std::remove(copy_path.c_str());
+  Deck third(deck_path);
+  EXPECT_TRUE(third.load());
+  std::ostringstream third_out;
+  const AbsorbResult none = absorb_conflicts(third, third_out, errors);
+  EXPECT_EQ(none.copies, 0);
+  EXPECT_EQ(none.exit_code(), 0);
+  EXPECT_TRUE(errors.str().empty());
+
+  for (const auto& path : {deck_path, log_path, copy_path}) {
+    std::remove(path.c_str());
+  }
+}
+
+void test_absorb_conflicts_undo() {
+  const std::string dir = temp_path("absorb-undo");
+  mkdir(dir.c_str(), 0755);
+  const std::string deck_path = dir + "/deck.txt";
+  const std::string log_path = log_path_for(deck_path);
+  const std::string copy_path = dir + "/deck.txt.sync-conflict-20260818-0900-A.log";
+  for (const auto& path : {deck_path, log_path, copy_path}) {
+    std::remove(path.c_str());
+  }
+
+  const int day = days_from_civil(2026, 8, 18);
+  const std::string card = "card0000000000001";
+  const ReviewEvent first = answer_event(card, stamp_on_day(day - 1, 9), true, 1, 2);
+  const ReviewEvent second = answer_event(card, stamp_on_day(day, 9), true, 2, 3);
+
+  // The other machine took the second answer back. An undo is recorded rather
+  // than erased precisely so that it can travel, and this is it arriving.
+  ReviewEvent undo;
+  undo.id = generate_id();
+  undo.card_id = card;
+  undo.timestamp = stamp_on_day(day, 10);
+  undo.undoes = second.id;
+
+  write_file(deck_path, "el perro,the dog,,2,0,3," + format_date(day) + "," +
+                            format_date(day + interval_for_box(3)) + "," +
+                            card + "\n");
+  write_file(log_path, events_as_log({first, second}));
+  write_file(copy_path, events_as_log({first, second, undo}));
+
+  Deck deck(deck_path);
+  EXPECT_TRUE(deck.load());
+  std::ostringstream out;
+  std::ostringstream errors;
+  const AbsorbResult result = absorb_conflicts(deck, out, errors);
+  EXPECT_TRUE(!result.failed);
+  EXPECT_EQ(result.absorbed, 1);
+  EXPECT_EQ(result.cards_updated, 1);
+
+  // The count goes down and the schedule rolls back, even though that means
+  // following the log to an older day than the deck was claiming. The log
+  // already covered this card, so it is the whole story for it.
+  Deck reloaded(deck_path);
+  EXPECT_TRUE(reloaded.load());
+  EXPECT_EQ(reloaded.cards()[0].times_correct, 1);
+  EXPECT_EQ(reloaded.cards()[0].leitner_box, 2);
+  EXPECT_EQ(reloaded.cards()[0].last_reviewed, day - 1);
+  EXPECT_EQ(reloaded.cards()[0].due_date, day - 1 + interval_for_box(2));
+  // And it says so rather than moving the numbers quietly.
+  EXPECT_TRUE(out.str().find("-1 correct") != std::string::npos);
+
+  for (const auto& path : {deck_path, log_path, copy_path}) {
+    std::remove(path.c_str());
+  }
+}
+
 void test_summarize() {
   const int today_days = today();
 
@@ -1688,6 +1987,11 @@ int main() {
   test_event_log_write_failure();
   test_merge_events();
   test_replay();
+  test_is_conflict_copy();
+  test_find_conflict_copies();
+  test_event_log_rewrite();
+  test_absorb_conflicts();
+  test_absorb_conflicts_undo();
   test_summarize();
   test_card_ids();
   test_wrap();

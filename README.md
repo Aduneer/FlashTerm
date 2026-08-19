@@ -44,6 +44,9 @@ supported for staged installs if you are packaging FlashTerm.
 ./FlashTerm --help             # usage
 ./FlashTerm --version          # version
 
+./FlashTerm deck.txt --absorb-conflicts   # merge the sync-conflict copies of
+                                          # deck.txt.log back into it
+
 export FLASHTERM_DECK=~/Sync/spanish.txt   # the deck to use when none is named
 export FLASHTERM_THEME=ocean               # default, ocean or sunset
 ```
@@ -88,7 +91,7 @@ typed `init`.
 * **Multiple accepted answers** — Separate alternatives with `|` — `std::unique_ptr|unique_ptr` — and any of them counts. The first is shown back to you when you miss the card, the rest as also accepted.
 * **Undo and fix in place** — After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
 * **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`, or whatever `FLASHTERM_DECK` points at.
-* **Works with the sync tool you already have** — Decks are plain text and saves are atomic, so Syncthing, Dropbox, `rsync` or git sync a deck between machines with no support needed from FlashTerm. See [Syncing Between Machines](#syncing-between-machines).
+* **Works with the sync tool you already have** — Decks are plain text and saves are atomic, so Syncthing, Dropbox, `rsync` or git sync a deck between machines with no support needed from FlashTerm. And when two machines review before they sync, `--absorb-conflicts` merges the conflict copy your sync tool left behind back into the review log and puts the scheduling it recorded back on the cards. See [Syncing Between Machines](#syncing-between-machines).
 * **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, automatic flagging of your hardest card, and how much you reviewed today alongside your current daily streak.
 * **Review log** — Every answer is appended to a `deck.txt.log` beside the deck: what was asked, which way round, whether you got it, and when, to the second. The card counters say what a card's state *is*; the log says what actually happened, which is what streaks, retention over time and merging two machines' reviews all need. It is append-only, so it never rewrites history and never conflicts.
 * **Single-keypress menus** — `2` enters review; no Enter, no waiting. Every screen that takes a key shows a legend of what the keys do. Guarded on `isatty`, so piped input still reads whole lines and every script, pipeline and recording keeps working unchanged. `Ctrl+C` at a menu saves and exits cleanly rather than killing the process.
@@ -377,12 +380,58 @@ The review log behaves better, because appending is not overwriting. Each
 machine's log stays complete on its own, and since the file only ever grows,
 sync clients handle it far more gracefully than the deck — git in particular
 merges append-only files cleanly, where deck lines conflict. So even when a
-deck write is lost, the record of *what you actually answered* usually is not.
+deck write is lost, the record of *what you actually answered* usually is not
+— and the next section is how you get it back.
 
-Reconstructing the deck from merged logs — the thing that would make concurrent
-review on two machines genuinely safe — is deliberately not wired up yet.
-`merge_events()` and `replay()` in `src/event.h` are the working, tested halves
-of it, waiting on the command that will call them.
+### Absorbing sync-conflict copies
+
+Two machines appending to the same log is the one case a sync client cannot
+resolve on its own. It keeps one version, parks the other beside it under a
+name like `spanish.txt.sync-conflict-20260818-101112-K3JQ7ZP.log`, and leaves
+it for a human. But neither copy is wrong: they are two halves of one history,
+and taking both is simply correct. So FlashTerm does:
+
+```bash
+FlashTerm ~/Sync/decks/spanish.txt --absorb-conflicts
+```
+
+Every conflict copy beside the log is merged into it by event id — a union,
+not a concatenation, so the events both machines already had appear once — the
+log is rewritten in timestamp order, and the deck's counters and due dates are
+brought up to date with the reviews it just gained:
+
+```
+Reading 1 sync-conflict copy of spanish.txt.log:
+  spanish.txt.sync-conflict-20260818-101112-K3JQ7ZP.log: 4 events
+Absorbed 3 new events into spanish.txt.log, now 12 events.
+  el perro                            +1 correct, box 2 -> 3, due 2026-08-25
+  la casa                             +1 incorrect, due 2026-08-19
+Updated 2 cards in spanish.txt.
+The copy was left in place. Delete when you are happy with the result:
+  rm spanish.txt.sync-conflict-20260818-101112-K3JQ7ZP.log
+```
+
+Syncthing, Dropbox and Nextcloud all name their copies differently and all
+three are recognised, along with anything else whose inserted name contains
+"conflict". A `.bak` or a `.tmp` sitting beside the log is not touched.
+
+Two things it deliberately does not do:
+
+* **It does not delete the conflict copies.** That is your call. Absorbing is
+  idempotent — running it again finds nothing new — so leaving them costs only
+  disk, while deleting the wrong file costs a history that exists nowhere else.
+* **It does not rebuild your counters from the log.** A deck that predates the
+  log has counters with no events behind them, and replaying it wholesale would
+  report every such card as brand new. Instead the log is replayed *twice*,
+  before the merge and after it, and only the difference is applied: your
+  counters gain exactly what the other machine recorded, and a card's box and
+  due date follow the merged log only when its newest event is no older than
+  what the deck already says. History from before the log survives untouched.
+
+If the deck file and the log arrive out of step — they are two files, and
+nothing makes a sync client deliver them together — events naming cards this
+deck has not received yet are kept in the log and counted the next time you
+absorb, once the cards are there.
 
 ## Development
 
@@ -398,8 +447,10 @@ the scheduling logic (calendar arithmetic, leap years, box intervals, due
 dates), the `Deck` persistence layer (atomic writes, write failures, lossless
 import/export, legacy-deck migration, statistics), the review log (event
 round-trips, damaged lines, card ids, streaks, and merging and replaying two
-machines' logs), text layout (column-accurate word wrapping), and command-line
-and environment handling.
+machines' logs), absorbing sync-conflict copies (which names count as one,
+finding them, atomic log rewrites, and the differential replay that leaves
+pre-log counters alone), text layout (column-accurate word wrapping), and
+command-line and environment handling.
 
 ### Golden End-to-End Tests
 
@@ -416,8 +467,10 @@ which are hard to reach any other way.
 
 Adding a case means creating a directory under `tests/golden/cases/` with an
 `input` file, optionally a starting `deck.txt`, an `args` file, an `env` file of
-`KEY=VALUE` lines, and an `audio/` directory for the deck's audio column to
-point at, and then:
+`KEY=VALUE` lines, an `audio/` directory for the deck's audio column to point
+at, and a `files/` directory whose contents are copied in as they are — which is
+how a case ships a review log and the conflict copies beside it, whose names the
+sync client invents — and then:
 
 ```bash
 tests/golden/run.sh --update    # write the expected transcripts
@@ -477,6 +530,7 @@ cannot drive an app that insists on a tty.
 | `src/generate.*` | `--generate-audio`: rendering a deck's recordings in bulk |
 | `src/voice.*` | Finding piper voices on disk, and explaining how to get one |
 | `src/event.*` | The append-only review log: events, ids, timestamps, merge and replay |
+| `src/sync.*` | `--absorb-conflicts`: finding a sync client's conflict copies and folding them back in |
 | `src/deck.*` | The `Deck` class: load, atomic save, import/export, tags, statistics |
 | `src/review.*` | Review session flow and the Leitner promotion rules |
 | `src/ui.*` | Menus, prompts and the statistics screen |

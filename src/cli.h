@@ -11,6 +11,7 @@ inline constexpr char kVersion[] = "0.2.0";
 enum class CliAction {
   RunDeck,        // Study `deck_path`.
   GenerateAudio,  // --generate-audio: render the deck's audio, then exit.
+  AbsorbConflicts,  // --absorb-conflicts: merge the log's conflict copies in.
   ShowHelp,       // --help: usage to stdout, exit 0.
   ShowVersion,    // --version: version to stdout, exit 0.
   Error,          // Bad usage: `error` to stderr, exit 2.

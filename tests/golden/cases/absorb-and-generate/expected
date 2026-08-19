@@ -1,5 +1,5 @@
 --- output ---
-FlashTerm: --force only applies to --generate-audio
+FlashTerm: --generate-audio and --absorb-conflicts cannot be combined
 
 FlashTerm - spaced-repetition flashcards in your terminal.
 

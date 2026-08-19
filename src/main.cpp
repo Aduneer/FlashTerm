@@ -9,6 +9,7 @@
 #include "deck.h"
 #include "generate.h"
 #include "review.h"
+#include "sync.h"
 #include "terminal.h"
 #include "text.h"
 #include "ui.h"
@@ -110,6 +111,7 @@ int main(int argc, char* argv[]) {
       std::cerr << "FlashTerm: " << options.error << "\n\n" << usage_text();
       return 2;
     case CliAction::GenerateAudio:
+    case CliAction::AbsorbConflicts:
     case CliAction::RunDeck:
       break;
   }
@@ -117,6 +119,17 @@ int main(int argc, char* argv[]) {
   // Required before text widths can account for multi-byte characters.
   std::setlocale(LC_ALL, "");
   color::detect();
+
+  if (options.action == CliAction::AbsorbConflicts) {
+    Deck deck(options.deck_path);
+    // Same rule as --generate-audio below: these operate on a deck that is
+    // already there, and a mistyped path must not become an empty new deck.
+    if (!deck.load()) {
+      std::cerr << "FlashTerm: no deck at " << deck.path() << "\n";
+      return 2;
+    }
+    return absorb_conflicts(deck, std::cout, std::cerr).exit_code();
+  }
 
   if (options.action == CliAction::GenerateAudio) {
     Deck deck(options.deck_path);

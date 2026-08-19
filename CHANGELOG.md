@@ -3,7 +3,10 @@
 Notable changes per release. Dates are the release date; the PR numbers link the
 detail, which is where the reasoning lives.
 
-## Unreleased
+## 0.3.0 — 2026-08-19
+
+Pictures on cards, sync that puts two machines' reviews back together, and a CI
+matrix that checks what used to be checked by hand.
 
 ### Added
 
@@ -19,7 +22,7 @@ detail, which is where the reasoning lives.
   The question that kept `replay()` unwired — how replayed state should meet
   counters that predate the log — is answered by replaying the log twice, before
   the merge and after it, and applying only the difference. A deck whose history
-  began before the log keeps it.
+  began before the log keeps it. (#20)
 
 - **Images on cards.** A new eleventh deck column names a picture beside the
   deck, drawn inside the card frame above the prompt. Terminals that speak the
@@ -47,7 +50,7 @@ detail, which is where the reasoning lives.
   A deck of pictures is still a deck: on a terminal that cannot draw them, in a
   pipe, or with `FLASHTERM_IMAGE=none`, it reviews as ordinary text. A missing
   file, or one that is not really an image, quietly becomes a card without a
-  picture rather than an error.
+  picture rather than an error. (#22)
 
 - **Four more example decks, and a fifth rewritten.** `http-status.csv` (18
   codes, tagged by class), `elements.csv` (19 symbols, including the ones from
@@ -57,12 +60,12 @@ detail, which is where the reasoning lives.
 
   `nato-phonetic.csv` is also the first shipped deck that exercises the
   single-key guard: reviewed reversed, its answers are single letters, so `Q`
-  and `A` would otherwise collide with the quit and audio keys.
+  and `A` would otherwise collide with the quit and audio keys. (#23)
 
 ### Changed
 
 - **Piper setup moved to `docs/audio.md`,** leaving the README with what the
-  feature *is* rather than how to install a text-to-speech engine.
+  feature *is* rather than how to install a text-to-speech engine. (#23)
 
 - **CI builds under the sanitizers and with `-Werror`,** as a four-way matrix of
   both compilers against an optimised and a sanitised build. Every pull request
@@ -73,7 +76,7 @@ detail, which is where the reasoning lives.
   being merged, not stop a contributor building the project at all. The
   sanitised entry also compiles with `-fno-sanitize-recover=undefined`, without
   which UBSan prints its diagnostic and exits 0 — so a real finding would have
-  been a green build that nobody reads the log of.
+  been a green build that nobody reads the log of. (#21)
 
 ## 0.2.0 — 2026-08-17
 

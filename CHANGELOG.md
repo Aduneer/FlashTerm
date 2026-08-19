@@ -49,7 +49,20 @@ detail, which is where the reasoning lives.
   file, or one that is not really an image, quietly becomes a card without a
   picture rather than an error.
 
+- **Four more example decks, and a fifth rewritten.** `http-status.csv` (18
+  codes, tagged by class), `elements.csv` (19 symbols, including the ones from
+  Latin names that make the deck worth having), `nato-phonetic.csv` (all 26),
+  and `colores.csv` with pictures. `general-knowledge.csv` grew from 5 cards to
+  12 real ones.
+
+  `nato-phonetic.csv` is also the first shipped deck that exercises the
+  single-key guard: reviewed reversed, its answers are single letters, so `Q`
+  and `A` would otherwise collide with the quit and audio keys.
+
 ### Changed
+
+- **Piper setup moved to `docs/audio.md`,** leaving the README with what the
+  feature *is* rather than how to install a text-to-speech engine.
 
 - **CI builds under the sanitizers and with `-Werror`,** as a four-way matrix of
   both compilers against an optimised and a sanitised build. Every pull request

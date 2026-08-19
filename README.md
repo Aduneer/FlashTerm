@@ -57,11 +57,18 @@ tracked by git, so studying never shows up as a source change.
 ### Starter Decks
 
 A new deck starts empty. To fill it, choose **5. Import flashcards** and give it
-any file from `examples/` — programming languages, tooling and human languages:
+any file from `examples/`:
 
-```bash
-ls examples/
-```
+| Deck | |
+| --- | --- |
+| `cpp.csv`, `python.csv` | Language features and syntax |
+| `git.csv`, `linux-cli.csv` | Commands worth having in your fingers |
+| `http-status.csv` | Status codes, tagged by class |
+| `elements.csv` | Chemical symbols, including the ones from Latin names |
+| `nato-phonetic.csv` | The phonetic alphabet, all 26 |
+| `spanish.csv`, `japanese.csv` | Vocabulary, foreign → English |
+| `colores.csv` | Colours, English → Spanish, **with pictures** |
+| `general-knowledge.csv` | A bit of everything |
 
 Imported cards arrive in Box 1 and are due immediately. Most of the examples are
 plain `question,answer,tags` records, the shortest form of the deck format below,
@@ -69,6 +76,23 @@ so they double as a template for writing your own. Several use `|` to accept mor
 than one answer, which is worth copying: `mañana` really does mean both
 *tomorrow* and *morning*, and `git init` should not be marked wrong because you
 typed `init`.
+
+`nato-phonetic.csv` is worth reviewing **reversed** (`r`) at least once: the
+answers become single letters, so `Q` and `A` would collide with the quit and
+audio keys. They are withheld exactly when a card could accept them, which is
+easier to believe once you have watched it happen.
+
+**Adding audio to a language deck** takes one command — recordings are rendered
+locally rather than shipped, so nothing large lives in this repo:
+
+```bash
+cp examples/spanish.csv ~/spanish.txt            # copy first: studying writes to the deck
+FlashTerm ~/spanish.txt --generate-audio         # lists the voices you have
+FlashTerm ~/spanish.txt --generate-audio --voice es_ES-davefx-medium
+```
+
+`ja_JA-hi_fi_captain-medium` does the same for `japanese.csv`, though Japanese
+needs one extra package first — see [docs/audio.md](docs/audio.md).
 
 `colores.csv` is the exception, and the one to copy if you want [pictures](#images):
 each card carries a colour swatch from `examples/images/`. It also runs
@@ -307,35 +331,15 @@ already has, whatever it calls its output flag:
 FLASHTERM_TTS_RENDER="espeak-ng -v fr --stdin -w {out}"
 ```
 
-#### About piper
+### Setting up piper
 
-[Piper](https://github.com/OHF-voice/piper1-gpl) is a neural text-to-speech
-system from the Home Assistant authors. It runs offline, needs no GPU, and its
-voices are dramatically better than `espeak-ng` for language learning — which is
-the whole point of hearing a card. Voices are about 60 MB each and cover 30-odd
-languages; list them all with
-`python3 -m piper.download_voices --help` (using the interpreter FlashTerm
-printed for you).
+Piper is a neural text-to-speech system that runs offline and sounds
+dramatically better than `espeak-ng` — which is the whole point of hearing a
+card. FlashTerm does not bundle it, link against it, or require it.
 
-FlashTerm does not bundle, link against, or require piper. It runs whatever
-command you put in `FLASHTERM_TTS_RENDER` as a separate process, so piper's
-GPL-3.0 licence applies to piper and FlashTerm stays MIT — and swapping in a
-different engine is a one-line change, not a fork.
-
-#### Japanese
-
-Piper's Japanese voice needs one extra package, because it phonemizes through
-`pyopenjtalk` rather than through espeak like the others, and `pipx install
-piper-tts` does not bring it along:
-
-```bash
-pipx inject piper-tts pyopenjtalk
-```
-
-The first card is then slow — it downloads a pronunciation dictionary of about
-23 MB once — and after that Japanese works like any other language, kanji
-included. Without it, rendering fails with a `ModuleNotFoundError`;
-FlashTerm recognises that particular failure and tells you the command above.
+**[docs/audio.md](docs/audio.md)** covers installing it, what the voices are,
+where they live, why there is no default voice, and the one extra package
+Japanese needs.
 
 One general caveat: a recording only ever matches the question it was rendered
 from. Edit a card's question and its audio is stale until you `--force`.

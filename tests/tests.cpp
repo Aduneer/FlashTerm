@@ -1,4 +1,5 @@
 // Minimal assert-style harness: no framework, just `make test`.
+#include <dirent.h>
 #include <sys/stat.h>
 
 #include <clocale>
@@ -1867,6 +1868,56 @@ void test_card_image_column() {
             std::string("decks/images/perro.png"));
 }
 
+void test_shipped_example_decks() {
+  // The example decks are content, not code, and a missing comma in one would
+  // not fail to build -- it would quietly drop a card, or worse, ship a card
+  // whose answer is empty and can therefore never be got right. Nothing else
+  // in the suite ever opens these files.
+  DIR* dir = opendir("examples");
+  if (dir == nullptr) {
+    // Run from somewhere other than the repo root. Say so rather than passing
+    // silently, which is what a vacuous check looks like from the outside.
+    std::cout << "SKIP: examples/ not found; run tests from the repo root\n";
+    return;
+  }
+
+  int decks = 0;
+  while (const dirent* entry = readdir(dir)) {
+    const std::string name = entry->d_name;
+    if (name.size() < 5 || name.substr(name.size() - 4) != ".csv") continue;
+    ++decks;
+
+    Deck deck("examples/" + name);
+    EXPECT_TRUE(deck.load());
+
+    // Every non-blank line has to have become a card: a deck that loses one to
+    // a stray quote still loads perfectly happily with fewer cards in it.
+    std::ifstream file("examples/" + name);
+    std::string line;
+    std::size_t lines = 0;
+    while (std::getline(file, line)) {
+      if (!trim(line).empty()) ++lines;
+    }
+    EXPECT_EQ(deck.size(), lines);
+
+    for (const auto& card : deck.cards()) {
+      EXPECT_TRUE(!trim(card.question).empty());
+      EXPECT_TRUE(!trim(card.answer).empty());
+      // An answer of only alternative separators accepts nothing at all.
+      EXPECT_TRUE(!normalize_answer(card.answer).empty());
+      // A picture named by a shipped deck has to actually be there, or the
+      // example teaches the feature by failing to demonstrate it.
+      if (!card.image.empty()) {
+        std::ifstream picture(deck.image_path(card), std::ios::binary);
+        EXPECT_TRUE(picture.good());
+      }
+    }
+  }
+  closedir(dir);
+  // Guards against the whole check passing because it found nothing to do.
+  EXPECT_TRUE(decks >= 8);
+}
+
 void test_summarize() {
   const int today_days = today();
 
@@ -2237,6 +2288,7 @@ int main() {
   test_image_protocol();
   test_image_terminal_detection();
   test_card_image_column();
+  test_shipped_example_decks();
   test_summarize();
   test_card_ids();
   test_wrap();

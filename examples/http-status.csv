@@ -1,0 +1,18 @@
+200,OK,http;status;success
+201,Created,http;status;success
+204,No Content,http;status;success
+301,Moved Permanently,http;status;redirect
+302,Found,http;status;redirect
+304,Not Modified,http;status;redirect
+400,Bad Request,http;status;client-error
+401,Unauthorized,http;status;client-error
+403,Forbidden,http;status;client-error
+404,Not Found,http;status;client-error
+405,Method Not Allowed,http;status;client-error
+409,Conflict,http;status;client-error
+422,Unprocessable Content|Unprocessable Entity,http;status;client-error
+429,Too Many Requests,http;status;client-error
+500,Internal Server Error,http;status;server-error
+502,Bad Gateway,http;status;server-error
+503,Service Unavailable,http;status;server-error
+504,Gateway Timeout,http;status;server-error

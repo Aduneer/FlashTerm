@@ -29,6 +29,11 @@ class Flashcard {
   // means the question gets spoken by a synthesiser instead; see audio.h.
   std::string audio;
 
+  // A picture for the card, resolved the same way `audio` is. Empty is the
+  // normal case; a card that names one shows it inside the frame on terminals
+  // that can draw it, and is an ordinary card everywhere else. See image.h.
+  std::string image;
+
   Flashcard(const std::string& q, const std::string& a,
             const std::vector<std::string>& t = {}, int correct = 0,
             int incorrect = 0, int leitner = 1);

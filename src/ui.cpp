@@ -195,6 +195,10 @@ void edit_card_fields(Flashcard& card) {
       prompt("Enter audio path, relative to the deck (current: " +
              (card.audio.empty() ? std::string("none") : card.audio) +
              ") [\"none\" to clear]: ");
+  const std::string picture =
+      prompt("Enter image path, relative to the deck (current: " +
+             (card.image.empty() ? std::string("none") : card.image) +
+             ") [\"none\" to clear]: ");
 
   if (!question.empty()) card.question = question;
   if (!answer.empty()) card.answer = answer;
@@ -203,6 +207,9 @@ void edit_card_fields(Flashcard& card) {
   // way to take a path back off a card; "none" is that way.
   if (!audio.empty()) {
     card.audio = (to_lowercase(audio) == "none") ? std::string() : audio;
+  }
+  if (!picture.empty()) {
+    card.image = (to_lowercase(picture) == "none") ? std::string() : picture;
   }
 }
 

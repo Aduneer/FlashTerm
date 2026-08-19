@@ -63,12 +63,20 @@ any file from `examples/` — programming languages, tooling and human languages
 ls examples/
 ```
 
-Imported cards arrive in Box 1 and are due immediately. The examples are plain
-`question,answer,tags` records, the shortest form of the deck format below, so
-they double as a template for writing your own. Several use `|` to accept more
+Imported cards arrive in Box 1 and are due immediately. Most of the examples are
+plain `question,answer,tags` records, the shortest form of the deck format below,
+so they double as a template for writing your own. Several use `|` to accept more
 than one answer, which is worth copying: `mañana` really does mean both
 *tomorrow* and *morning*, and `git init` should not be marked wrong because you
 typed `init`.
+
+`colores.csv` is the exception, and the one to copy if you want [pictures](#images):
+each card carries a colour swatch from `examples/images/`. It also runs
+**English → Spanish**, against the direction of every other language deck here,
+and that is the point rather than an oversight. A picture shows you the
+*meaning*, so on a `rojo → red` card it hands you the answer; on `red → rojo` it
+cannot, because no picture spells a Spanish word. Put the picture on the side
+that asks, not the side that answers.
 
 ## Key Features
 
@@ -92,6 +100,7 @@ typed `init`.
 * **Undo and fix in place** — After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
 * **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`, or whatever `FLASHTERM_DECK` points at.
 * **Works with the sync tool you already have** — Decks are plain text and saves are atomic, so Syncthing, Dropbox, `rsync` or git sync a deck between machines with no support needed from FlashTerm. And when two machines review before they sync, `--absorb-conflicts` merges the conflict copy your sync tool left behind back into the review log and puts the scheduling it recorded back on the cards. See [Syncing Between Machines](#syncing-between-machines).
+* **Images** — A card can name a picture in the deck's eleventh column, drawn inside the card frame. Terminals that speak the kitty graphics protocol (kitty, Ghostty) need nothing installed at all; everything else draws it as coloured text blocks via [chafa](https://hpjansson.org/chafa/), which works even over `ssh` and inside `tmux`. Aspect ratio is preserved and the picture is fitted to the frame, so a panorama and a portrait both land inside the borders. A deck of pictures still reviews as plain text anywhere that cannot draw them. See [Images](#images).
 * **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, automatic flagging of your hardest card, and how much you reviewed today alongside your current daily streak.
 * **Review log** — Every answer is appended to a `deck.txt.log` beside the deck: what was asked, which way round, whether you got it, and when, to the second. The card counters say what a card's state *is*; the log says what actually happened, which is what streaks, retention over time and merging two machines' reviews all need. It is append-only, so it never rewrites history and never conflicts.
 * **Single-keypress menus** — `2` enters review; no Enter, no waiting. Every screen that takes a key shows a legend of what the keys do. Guarded on `isatty`, so piped input still reads whole lines and every script, pipeline and recording keeps working unchanged. `Ctrl+C` at a menu saves and exits cleanly rather than killing the process.
@@ -161,10 +170,10 @@ and exit.
 
 ## Deck File Format
 
-One CSV record per card, with the last seven fields optional:
+One CSV record per card, with the last eight fields optional:
 
 ```
-question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id,audio
+question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id,audio,image
 ```
 
 Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers may list alternatives separated by `|`. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
@@ -176,9 +185,14 @@ not orphan the card's history.
 
 `audio` is a recording of the *question*, as a path relative to the deck file —
 so a deck and the audio directory beside it can be moved or synced as one thing.
-It is written only when a card has one, which means a deck with no audio comes
-out byte for byte as earlier versions wrote it, and syncing between a machine
-that has updated and one that has not does not put the whole file in conflict.
+
+`image` is a picture for the card, resolved the same way. See [Images](#images).
+
+Both are written only as far as the last column a card actually uses, which
+means a deck with neither comes out byte for byte as earlier versions wrote it,
+and syncing between a machine that has updated and one that has not does not put
+the whole file in conflict. A card with a picture and no recording still writes
+the empty audio column, because position is what names a field in a CSV.
 
 ### Review Log Format
 
@@ -340,6 +354,74 @@ The command is split on whitespace and run directly — never through a shell �
 and the text or path is appended as its last argument. A card whose question is
 `rm -rf ~` is a card about shell quoting and stays one.
 
+## Images
+
+A card can carry a picture, in the deck's eleventh column:
+
+```
+el perro,the dog,animals,0,0,1,,,a1b2c3d4e5f60718,,images/perro.png
+```
+
+The path is relative to the deck file, so a deck and the `images/` directory
+beside it move, sync and back up as one thing. It is drawn inside the card
+frame, above the prompt:
+
+```
+┌──────────────────────────────────────────┐
+│ Box 1  ·  new  ·  animals                │
+├──────────────────────────────────────────┤
+│                                          │
+│              ▄▄▄▄▄▄▄▄▄▄▄▄                │
+│              █ a picture █                │
+│              ▀▀▀▀▀▀▀▀▀▀▀▀                │
+│                                          │
+│   el perro                               │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+PNG, GIF and JPEG are understood. Only the header is read — enough to learn the
+dimensions — so a large photograph costs no more to display than a thumbnail.
+
+### What your terminal needs
+
+Nothing, on a terminal that speaks the **kitty graphics protocol**: kitty,
+Ghostty and WezTerm are drawn to directly, with no library linked and no tool
+installed. FlashTerm sends the *path* rather than the picture, so the escape
+sequence is about sixty bytes however big the file is — which matters on a
+screen that redraws after every keypress.
+
+For anything else, install [chafa](https://hpjansson.org/chafa/) and the picture
+is drawn as **coloured text blocks** — which need no graphics support of any
+kind, and so work in any terminal at all, including inside `tmux` and over
+`ssh`. That is the whole demo GIF above: those trees are text. chafa is optional
+in exactly the way `espeak-ng` is — present, pictures; absent, no pictures.
+
+`FLASHTERM_IMAGE` overrides the guess: `kitty`, `chafa`, or `none` to turn
+pictures off entirely.
+
+**Set it to `kitty` if your terminal can draw graphics but does not say so in
+`$TERM`** — WezTerm is the common case. Detection reads `$TERM` and nothing
+else, on purpose. `$TERM_PROGRAM` and `$KITTY_WINDOW_ID` look tempting and are
+traps: they are ordinary environment variables, so they are *inherited* and
+outlive the terminal that set them. A shell opened inside `tmux`, over `ssh`, or
+in a screen recorder still carries them, and believing them means reserving room
+for a picture in a terminal that cannot draw one — leaving a hole in the card,
+which is worse than showing no picture at all. `$TERM` is replaced per session,
+so it tells the truth.
+
+**A deck full of pictures is still a deck.** On a terminal that cannot draw
+them, in a pipe, or with `FLASHTERM_IMAGE=none`, the same deck reviews as
+ordinary text — the picture is simply not shown, and nothing about the card,
+its scheduling or its log changes. The same is true of a card whose image file
+has been deleted or is not really an image: it quietly becomes a card without a
+picture rather than an error.
+
+**One thing to decide for yourself:** the picture is shown with the *question*,
+not held back until the answer. For a visual-vocabulary deck that is the whole
+point. For a deck where the picture *is* the answer, do not add one to that
+card — there is no per-card setting for which side it belongs to.
+
 ## Syncing Between Machines
 
 There is no sync server and no account. A deck is a text file, so the tool you
@@ -449,8 +531,10 @@ import/export, legacy-deck migration, statistics), the review log (event
 round-trips, damaged lines, card ids, streaks, and merging and replaying two
 machines' logs), absorbing sync-conflict copies (which names count as one,
 finding them, atomic log rewrites, and the differential replay that leaves
-pre-log counters alone), text layout (column-accurate word wrapping), and
-command-line and environment handling.
+pre-log counters alone), images (PNG, GIF and JPEG header parsing including a
+JPEG segment walk, aspect-preserving fitting, and protocol selection), text
+layout (column-accurate word wrapping), and command-line and environment
+handling.
 
 ### Golden End-to-End Tests
 
@@ -470,7 +554,7 @@ Adding a case means creating a directory under `tests/golden/cases/` with an
 `KEY=VALUE` lines, an `audio/` directory for the deck's audio column to point
 at, and a `files/` directory whose contents are copied in as they are — which is
 how a case ships a review log and the conflict copies beside it, whose names the
-sync client invents — and then:
+sync client invents, or an `images/` directory for the image column — and then:
 
 ```bash
 tests/golden/run.sh --update    # write the expected transcripts
@@ -529,6 +613,7 @@ cannot drive an app that insists on a tty.
 | `src/audio.*` | Finding a player or synthesiser on the PATH, and running it |
 | `src/generate.*` | `--generate-audio`: rendering a deck's recordings in bulk |
 | `src/voice.*` | Finding piper voices on disk, and explaining how to get one |
+| `src/image.*` | Drawing a card's picture: image headers, aspect fitting, terminal protocols |
 | `src/event.*` | The append-only review log: events, ids, timestamps, merge and replay |
 | `src/sync.*` | `--absorb-conflicts`: finding a sync client's conflict copies and folding them back in |
 | `src/deck.*` | The `Deck` class: load, atomic save, import/export, tags, statistics |

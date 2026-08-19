@@ -22,6 +22,16 @@
 # /usr/bin/awk on Debian and Ubuntu, so on CI -- does not support {n}.
 
 BEGIN {
+  # Escape sequences are matched as bytes rather than by regex metacharacters,
+  # so that this behaves the same under mawk and gawk. A picture reaches the
+  # transcript as a kitty graphics escape wrapped around base64, and the frame
+  # positions itself around it with cursor moves; left raw, both are unreadable
+  # in a diff and are exactly the "invalid multibyte data" awk complains about.
+  esc = sprintf("%c", 27)
+  graphics_start = esc "_G"
+  graphics_end = esc "\\"
+  cursor_move = esc "\\[[0-9]+[ABCD]"
+
   d = "[0-9]"
   h = "[0-9a-f]"
   date = d d d d "-" d d "-" d d
@@ -49,8 +59,40 @@ function placeholder(token,   kind, key) {
   return "<" kind seen[key] ">"
 }
 
+# The picture itself never reaches a transcript -- only the instruction to draw
+# it -- so what is checked is the box it was given and the file it named. Both
+# are the things that break.
+function collapse_graphics(line,   at, rest, stop) {
+  while ((at = index(line, graphics_start)) > 0) {
+    rest = substr(line, at + length(graphics_start))
+    stop = index(rest, graphics_end)
+    if (stop == 0) break
+    line = substr(line, 1, at - 1) "<IMAGE " substr(rest, 1, stop - 1) ">" \
+           substr(rest, stop + length(graphics_end))
+  }
+  return line
+}
+
+# Cursor moves are kept rather than dropped: the frame draws itself, walks back
+# up into the space it reserved, and walks back down. Those two counts have to
+# match, and a transcript that shows them is what catches it when they stop
+# matching.
+function collapse_cursor(line,   out, token, n) {
+  out = ""
+  while (match(line, cursor_move)) {
+    token = substr(line, RSTART, RLENGTH)
+    n = substr(token, 3, length(token) - 3)
+    out = out substr(line, 1, RSTART - 1) "<CURSOR " substr(token, length(token), 1) n ">"
+    line = substr(line, RSTART + RLENGTH)
+  }
+  return out line
+}
+
 {
   line = $0
+  line = collapse_graphics(line)
+  line = collapse_cursor(line)
+  gsub(/\r/, "<CR>", line)
   gsub(/FlashTerm [0-9]+\.[0-9]+\.[0-9]+/, "FlashTerm <VERSION>", line)
 
   # Where the checkout happens to live is not a property of the program. A

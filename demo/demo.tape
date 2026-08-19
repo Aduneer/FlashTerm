@@ -22,6 +22,11 @@ Set Shell "bash"
 # for the key legend that replaced its "press any key" line. A row is roughly
 # 23.5px at this font size, which is what to add per new line.
 #
+# The card frame is now a second thing worth measuring: "el árbol" carries a
+# picture, which adds its rows plus one to the frame. It still comes in under
+# the dashboard, so the canvas is unchanged -- but a taller picture would not,
+# and the card, not the dashboard, would become what sets the height.
+#
 # 900px is about 89 columns, and the prompt after an answer is 103 once audio is
 # offered, so that legend wraps onto two lines here. That is deliberate and not
 # a defect to widen the canvas for: it is what an 80-column terminal does too,
@@ -44,9 +49,20 @@ Set TypingSpeed 75ms
 
 # Build, then work on a throwaway copy in a temp directory: the recording must
 # never touch a real deck, and every run has to start from the same state.
+#
+# TERM_PROGRAM and KITTY_WINDOW_ID are cleared because vhs inherits the
+# environment of whatever launched it, and both of those outlive the terminal
+# that set them. Recorded from a Ghostty window they arrive here saying
+# "Ghostty" about a terminal that is actually xterm.js and cannot draw a kitty
+# graphic at all -- so chafa would pick a format nothing renders and the card
+# would show an empty hole where its picture belongs. $TERM is the honest
+# signal and vhs sets it correctly, so clearing the other two leaves chafa to
+# work it out properly and draw the picture as coloured blocks, which is what a
+# reader without a graphics terminal actually sees.
 Hide
 Type "make >/dev/null 2>&1" Enter
-Type "DEMO=$(mktemp -d) && cp FlashTerm $DEMO/ && cp demo/demo-deck.txt $DEMO/spanish.txt && cd $DEMO" Enter
+Type "DEMO=$(mktemp -d) && cp FlashTerm $DEMO/ && cp demo/demo-deck.txt $DEMO/spanish.txt && cp -R demo/images $DEMO/ && cd $DEMO" Enter
+Type "unset TERM_PROGRAM KITTY_WINDOW_ID" Enter
 Type "export PS1='$ ' && clear" Enter
 Show
 

@@ -51,6 +51,14 @@ Environment:
                    theme says.
   FLASHTERM_VOICES Extra directories to search for piper voices, separated by
                    colons like PATH. The usual places are searched anyway.
+  FLASHTERM_IMAGE  How to draw a card's picture: "kitty" for terminals that
+                   speak the kitty graphics protocol, "chafa" to draw it as
+                   coloured text blocks instead, or "none" to draw nothing.
+                   Worked out from $TERM otherwise. Worth setting to "kitty"
+                   on a terminal that can manage it but does not say so in
+                   $TERM, WezTerm being the common one. A deck full of
+                   pictures still reviews perfectly well as text, so this is
+                   never required.
   FLASHTERM_TTS_RENDER
                    A synthesiser other than piper for --generate-audio, which
                    it then uses instead of --voice: "{out}" is replaced with
@@ -67,5 +75,11 @@ Environment:
 Audio is optional in every sense: nothing is linked against, nothing is
 installed, and if none of the above is on the PATH then review simply does not
 offer the key. Press "a" during a review to hear the card.
+
+Pictures work the same way. A card's eleventh column names an image beside the
+deck, drawn inside the card frame: as a real graphic on terminals that speak
+the kitty protocol, and as coloured text blocks through chafa if it is
+installed, which needs no graphics support at all. Everywhere else the same
+deck is an ordinary deck of text.
 --- exit status ---
 2

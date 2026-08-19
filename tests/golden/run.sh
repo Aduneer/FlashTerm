@@ -56,6 +56,20 @@ fi
 emit_files() {
   find . -type f | LC_ALL=C sort | while read -r file; do
     printf -- '--- file %s ---\n' "${file#./}"
+
+    # A binary file is described rather than embedded. A picture fixture is
+    # the case that forced this: its bytes are not what any test is about,
+    # they make the transcript undiffable, and they are exactly the "invalid
+    # multibyte data" that makes one awk behave differently from another.
+    # Detected by looking for a NUL, which is what every "is this text" check
+    # has always come down to.
+    size=$(wc -c <"$file")
+    stripped=$(LC_ALL=C tr -d '\000' <"$file" | wc -c)
+    if [ "$size" -ne "$stripped" ]; then
+      printf -- '<binary, %s bytes>\n' "$size"
+      continue
+    fi
+
     cat "$file"
     # A file that does not end in a newline would otherwise run into the next
     # header and hide its own last line inside it. Command substitution strips
@@ -127,6 +141,12 @@ run_case() {
   # inside the case's own working directory -- where a case can put voices/ if
   # it wants any to be found, and where there are none otherwise.
   #
+  # FLASHTERM_IMAGE is pinned for the same reason and is the sharpest example
+  # yet: whether a card shows a picture would otherwise depend on $TERM and on
+  # whether chafa happens to be installed, so the same case would draw an image
+  # on a developer's machine and nothing at all on CI. A case that wants
+  # pictures names a protocol in its own env file.
+  #
   # Pinned here rather than per case on purpose: a case that forgets passes on
   # a laptop and fails on CI, which is precisely what happened before this was
   # a default. The case env comes last, so a case can still override any of it.
@@ -134,7 +154,7 @@ run_case() {
     cd "$work_dir"
     # shellcheck disable=SC2086
     env -u FLASHTERM_DECK -u FLASHTERM_THEME TZ=UTC NO_COLOR=1 FLASHTERM_SEED=1 \
-      HOME=. FLASHTERM_VOICES=voices \
+      HOME=. FLASHTERM_VOICES=voices FLASHTERM_IMAGE=none \
       PATH="$script_dir/fakebin:/usr/bin:/bin" \
       FLASHTERM_TTS="$script_dir/fake-audio.sh speak" \
       FLASHTERM_PLAYER="$script_dir/fake-audio.sh play" \
@@ -153,7 +173,7 @@ run_case() {
     echo '--- exit status ---'
     echo "$status"
     cd "$work_dir" && emit_files
-  } | awk -v root="$root" -f "$script_dir/normalise.awk" \
+  } | LC_ALL=C awk -v root="$root" -f "$script_dir/normalise.awk" \
     >"$work_root/$name.transcript"
 
   if [ "$update" -eq 1 ]; then

@@ -21,6 +21,34 @@ detail, which is where the reasoning lives.
   the merge and after it, and applying only the difference. A deck whose history
   began before the log keeps it.
 
+- **Images on cards.** A new eleventh deck column names a picture beside the
+  deck, drawn inside the card frame above the prompt. Terminals that speak the
+  kitty graphics protocol — kitty, Ghostty, WezTerm — need nothing installed:
+  the escape sequence names the *file*, so it stays about sixty bytes however
+  large the picture, which matters on a screen that redraws after every
+  keypress. Everything else draws the picture as coloured text blocks through
+  [chafa](https://hpjansson.org/chafa/) when it is installed, which needs no
+  graphics support at all and so works over `ssh` and inside `tmux`.
+  `FLASHTERM_IMAGE` overrides the guess with `kitty`, `chafa` or `none`.
+
+  Detection reads `$TERM` alone. `$TERM_PROGRAM` and `$KITTY_WINDOW_ID` are
+  inherited rather than set per session, so they outlive the terminal that set
+  them and are still present under `tmux`, over `ssh`, or in a screen recorder
+  — believing them reserved room for a picture that then could not be drawn,
+  leaving a hole in the card. Terminals that can draw but do not say so in
+  `$TERM`, such as WezTerm, want `FLASHTERM_IMAGE=kitty`.
+
+  PNG, GIF and JPEG are understood, header only, so a large photograph costs
+  no more to display than a thumbnail. Aspect ratio is preserved and the
+  picture is fitted to the frame — the terminal stretches to fill whatever box
+  it is handed, so a panorama would otherwise come out looking twice as wide
+  as it is.
+
+  A deck of pictures is still a deck: on a terminal that cannot draw them, in a
+  pipe, or with `FLASHTERM_IMAGE=none`, it reviews as ordinary text. A missing
+  file, or one that is not really an image, quietly becomes a card without a
+  picture rather than an error.
+
 ### Changed
 
 - **CI builds under the sanitizers and with `-Werror`,** as a four-way matrix of

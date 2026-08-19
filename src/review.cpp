@@ -13,6 +13,7 @@
 #include "audio.h"
 #include "date.h"
 #include "event.h"
+#include "image.h"
 #include "schedule.h"
 #include "terminal.h"
 #include "text.h"
@@ -324,18 +325,41 @@ std::size_t frame_inner_width() {
   return frame_width - 4;
 }
 
+// The box a card's picture gets, or an empty one when there is no picture, no
+// terminal that can draw it, or a file that is not an image after all.
+//
+// Height is capped well under the terminal's own so that a picture cannot push
+// the prompt off the screen: the thing being answered matters more than the
+// thing being looked at. Width is the frame's, which is what keeps the borders
+// where they are.
+image::Placement card_image_box(const std::string& path) {
+  if (path.empty() || !image::available()) return {};
+  const image::Size size = image::read_size(path);
+  if (!size.valid()) return {};
+
+  const int max_rows = std::max(3, std::min(12, terminal_height() / 3));
+  return image::fit(size, static_cast<int>(frame_inner_width()), max_rows,
+                    image::cell_aspect());
+}
+
 // How tall the frame will be, worked out before anything is printed so the
 // caller can centre it. Kept next to print_card because the two have to agree.
 int count_frame_lines(const std::string& summary,
-                      const std::string& prompt_line) {
+                      const std::string& prompt_line,
+                      const image::Placement& picture) {
   const std::size_t inner = frame_inner_width();
   const std::size_t lines =
       wrap(summary, inner).size() + wrap(prompt_line, inner - 2).size();
   // Four border and blank rows, plus the separator.
-  return static_cast<int>(lines) + 5;
+  int total = static_cast<int>(lines) + 5;
+  // The picture's own rows, and the blank one that keeps it off the separator.
+  if (!picture.empty()) total += picture.rows + 1;
+  return total;
 }
 
-void print_card(const std::string& summary, const std::string& prompt_line) {
+void print_card(const std::string& summary, const std::string& prompt_line,
+                const std::string& picture_path,
+                const image::Placement& picture) {
   const std::size_t inner = frame_inner_width();
 
   std::string rule;
@@ -357,12 +381,38 @@ void print_card(const std::string& summary, const std::string& prompt_line) {
   edge("┌", "┐");
   for (const auto& line : summary_lines) row(line, 0, color::reset);
   edge("├", "┤");
+  // The picture's rows are drawn as ordinary empty frame rows and the picture
+  // is dropped into them afterwards. It has to be this way round: the terminal
+  // leaves the cursor inside the image rather than below it, so anything
+  // printed after a picture lands on top of it.
+  const std::size_t indent =
+      picture.empty()
+          ? 0
+          : (inner - std::min(inner, static_cast<std::size_t>(picture.columns))) / 2;
+  if (!picture.empty()) {
+    for (int i = 0; i < picture.rows; ++i) row("", 0, color::reset);
+  }
   row("", 0, color::reset);
   // The prompt is the one thing on screen actually worth reading, so it is
   // indented within the frame and given the emphasis colour.
   for (const auto& line : prompt_lines) row(line, 2, color::yellow);
   row("", 0, color::reset);
   edge("└", "┘");
+
+  if (picture.empty()) return;
+
+  // Back up to the first reserved row, across to where the picture starts,
+  // draw, and return to where we were. Counted from the bottom edge: the
+  // reserved rows, the blank one under them, the prompt, its blank row, and
+  // the edge itself.
+  const int below = picture.rows + 1 + static_cast<int>(prompt_lines.size()) + 2;
+  const int column = static_cast<int>(indent) + 2;
+  std::cout << "\033[" << below << "A\r";
+  if (column > 0) std::cout << "\033[" << column << "C";
+  image::draw(picture_path, picture, column, std::cout);
+  // Counted from the top of the picture wherever drawing finished, so this has
+  // to return to a known row first rather than assume one.
+  std::cout << "\r\033[" << below << "B";
 }
 
 // Pads the top of the screen so the card sits in the middle of the window
@@ -642,13 +692,18 @@ void review_flashcards(Deck& deck) {
       const std::string summary =
           card_summary(card, today_days, session.reversed);
       const std::string shown = prompt_text(card, session.reversed);
+      // Recomputed on every redraw rather than once per card, because the box
+      // depends on the terminal's size and the terminal can be resized between
+      // one keypress and the next.
+      const std::string picture_path = deck.image_path(card);
+      const image::Placement picture = card_image_box(picture_path);
       // Two for the progress bar and its blank line, two for the prompt line
       // and the breathing room above it.
-      centre_vertically(count_frame_lines(summary, shown) + 4);
+      centre_vertically(count_frame_lines(summary, shown, picture) + 4);
 
       print_progress(idx + 1, matches.size());
       std::cout << "\n";
-      print_card(summary, shown);
+      print_card(summary, shown, picture_path, picture);
       std::cout << "\n";
       if (hinted) {
         std::cout << color::yellow << "Hint: " << hint_for(expected) << "\n"

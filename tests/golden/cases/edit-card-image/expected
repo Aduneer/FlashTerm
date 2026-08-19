@@ -1,0 +1,57 @@
+--- output ---
+Loaded 1 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (1 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Manage Flashcards ---
+[1] List flashcards
+[2] Edit a flashcard
+[3] Delete a flashcard
+[4] Find flashcards
+[q] Back to the main menu
+> Search question, answer or tags (Enter to list all): 
+1. el perro - the dog [Tags: animals] (Box 1, due new)
+
+Enter the number of the flashcard to edit: Enter new question (current: el perro): Enter new answer (current: the dog) [use | to accept alternatives]: Enter new tags (semicolon;separated, current: animals): Enter audio path, relative to the deck (current: none) ["none" to clear]: Enter image path, relative to the deck (current: none) ["none" to clear]: Flashcard updated!
+
+
+--- Manage Flashcards ---
+[1] List flashcards
+[2] Edit a flashcard
+[3] Delete a flashcard
+[4] Find flashcards
+[q] Back to the main menu
+> Invalid choice. Please try again.
+
+--- Manage Flashcards ---
+[1] List flashcards
+[2] Edit a flashcard
+[3] Delete a flashcard
+[4] Find flashcards
+[q] Back to the main menu
+> Invalid choice. Please try again.
+
+--- Manage Flashcards ---
+[1] List flashcards
+[2] Edit a flashcard
+[3] Delete a flashcard
+[4] Find flashcards
+[q] Back to the main menu
+> 
+Input stream closed/EOF. Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+el perro,the dog,animals,0,0,1,,,card0000000000001,,images/perro.png
+--- file images/perro.png ---
+<binary, 597 bytes>

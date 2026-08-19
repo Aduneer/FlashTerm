@@ -8,7 +8,8 @@
 namespace FlashTerm {
 
 // One card as a CSV record:
-//   question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id,audio
+//   question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id,
+//   audio,image
 // Trailing columns are optional when reading, so a deck written by any earlier
 // version still loads; writing always emits all of them.
 std::string card_to_csv(const Flashcard& card);
@@ -59,6 +60,11 @@ class Deck {
   // Where a card's recording actually is; `resolve` applied to its column.
   std::string audio_path(const Flashcard& card) const {
     return resolve(card.audio);
+  }
+
+  // Likewise for its picture, so a deck and the images beside it move as one.
+  std::string image_path(const Flashcard& card) const {
+    return resolve(card.image);
   }
 
   // The review log lives beside the deck file and is loaded along with it: it

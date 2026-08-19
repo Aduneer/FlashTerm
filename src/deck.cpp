@@ -39,13 +39,19 @@ std::string card_to_csv(const Flashcard& card) {
       format_date(card.last_reviewed) + "," + format_date(card.due_date) + "," +
       escape_csv_field(card.id);
 
-  // Written only when the card has one. A deck with no audio -- which is most
-  // decks -- then comes out byte for byte as every earlier version wrote it.
-  // That matters because decks are synced between machines as plain files: a
-  // trailing comma on every line would put the whole deck in conflict the
-  // first time one machine saved it and the other had not updated yet.
-  if (card.audio.empty()) return row;
-  return row + "," + escape_csv_field(card.audio);
+  // Written only as far as the last column the card actually uses. A deck with
+  // no audio and no pictures -- which is most decks -- then comes out byte for
+  // byte as every earlier version wrote it. That matters because decks are
+  // synced between machines as plain files: a trailing comma on every line
+  // would put the whole deck in conflict the first time one machine saved it
+  // and the other had not updated yet.
+  //
+  // A card with a picture and no recording still has to write the empty audio
+  // column, since position is what names a field in a CSV.
+  if (card.audio.empty() && card.image.empty()) return row;
+  const std::string with_audio = row + "," + escape_csv_field(card.audio);
+  if (card.image.empty()) return with_audio;
+  return with_audio + "," + escape_csv_field(card.image);
 }
 
 bool card_from_csv(const std::string& line, Flashcard* out) {
@@ -71,6 +77,7 @@ bool card_from_csv(const std::string& line, Flashcard* out) {
   // recording.
   out->id = (fields.size() >= 9) ? trim(fields[8]) : "";
   out->audio = (fields.size() >= 10) ? trim(fields[9]) : "";
+  out->image = (fields.size() >= 11) ? trim(fields[10]) : "";
   return true;
 }
 

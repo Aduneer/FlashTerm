@@ -42,7 +42,7 @@ Next review in 3 days (<DATE1>).
 
 [Enter] next card   [a] hear the question   [e] edit this card
 [u] undo this answer   [q] end session
-> Enter new question (current: Bonjour): Enter new answer (current: Hello) [use | to accept alternatives]: Enter new tags (semicolon;separated, current: french): Enter audio path, relative to the deck (current: none) ["none" to clear]: Card updated.
+> Enter new question (current: Bonjour): Enter new answer (current: Hello) [use | to accept alternatives]: Enter new tags (semicolon;separated, current: french): Enter audio path, relative to the deck (current: none) ["none" to clear]: Enter image path, relative to the deck (current: none) ["none" to clear]: Card updated.
 
 [Enter] next card   [a] hear the question   [e] edit this card
 [u] undo this answer   [q] end session

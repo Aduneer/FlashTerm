@@ -17,6 +17,7 @@
 #include "date.h"
 #include "deck.h"
 #include "event.h"
+#include "image.h"
 #include "review.h"
 #include "schedule.h"
 #include "sync.h"
@@ -1627,6 +1628,245 @@ void test_absorb_conflicts_undo() {
   }
 }
 
+// Headers written by hand rather than shipped as binary fixtures: the bytes
+// below *are* what read_size parses, so a test that builds them is testing the
+// thing itself rather than a picture somebody once made.
+void write_bytes(const std::string& path, const std::vector<unsigned char>& bytes) {
+  std::ofstream file(path, std::ios::binary);
+  file.write(reinterpret_cast<const char*>(bytes.data()),
+             static_cast<std::streamsize>(bytes.size()));
+}
+
+std::vector<unsigned char> png_header(unsigned width, unsigned height) {
+  std::vector<unsigned char> bytes = {0x89, 'P',  'N',  'G',  0x0D, 0x0A, 0x1A,
+                                      0x0A, 0,    0,    0,    13,   'I',  'H',
+                                      'D',  'R'};
+  for (int shift : {24, 16, 8, 0}) bytes.push_back((width >> shift) & 0xFF);
+  for (int shift : {24, 16, 8, 0}) bytes.push_back((height >> shift) & 0xFF);
+  bytes.push_back(8);  // bit depth, and enough bytes to look like a real IHDR
+  bytes.push_back(6);
+  return bytes;
+}
+
+void test_image_dimensions() {
+  const std::string png = temp_path("pic.png");
+  write_bytes(png, png_header(240, 160));
+  image::Size size = image::read_size(png);
+  EXPECT_EQ(size.width, 240);
+  EXPECT_EQ(size.height, 160);
+  EXPECT_TRUE(size.valid());
+
+  // GIF says the same thing little-endian, which is the easiest byte order to
+  // get backwards.
+  const std::string gif = temp_path("pic.gif");
+  write_bytes(gif, {'G', 'I', 'F', '8', '9', 'a', 0x40, 0x01, 0x20, 0x00});
+  size = image::read_size(gif);
+  EXPECT_EQ(size.width, 320);
+  EXPECT_EQ(size.height, 32);
+
+  // JPEG hides its dimensions in a start-of-frame segment that has to be
+  // walked to, past a segment that is deliberately in the way here.
+  const std::string jpeg = temp_path("pic.jpg");
+  write_bytes(jpeg, {0xFF, 0xD8,                          // SOI
+                     0xFF, 0xE0, 0x00, 0x04, 0x00, 0x00,  // APP0, skipped
+                     0xFF, 0xC0, 0x00, 0x11, 0x08,        // SOF0
+                     0x00, 0x64,                          // height 100
+                     0x00, 0xC8,                          // width 200
+                     0x03});
+  size = image::read_size(jpeg);
+  EXPECT_EQ(size.width, 200);
+  EXPECT_EQ(size.height, 100);
+
+  // A JPEG whose C4 segment would be mistaken for a frame by a reader that
+  // only checks the C0-CF range.
+  const std::string huffman = temp_path("huffman.jpg");
+  write_bytes(huffman, {0xFF, 0xD8, 0xFF, 0xC4, 0x00, 0x04, 0x00, 0x00,
+                        0xFF, 0xC2, 0x00, 0x11, 0x08, 0x00, 0x2A, 0x00,
+                        0x37, 0x03});
+  size = image::read_size(huffman);
+  EXPECT_EQ(size.width, 55);
+  EXPECT_EQ(size.height, 42);
+
+  // Everything that is not a picture is simply not a picture: no error, no
+  // exception, and a card that shows text only.
+  write_bytes(temp_path("notpic.txt"), {'h', 'e', 'l', 'l', 'o', '\n', 'w',
+                                        'o', 'r', 'l', 'd', '\n'});
+  EXPECT_TRUE(!image::read_size(temp_path("notpic.txt")).valid());
+  EXPECT_TRUE(!image::read_size(temp_path("no-such-file.png")).valid());
+  EXPECT_TRUE(!image::read_size("").valid());
+  // A PNG whose header says it is zero pixels wide would divide by zero later.
+  write_bytes(temp_path("zero.png"), png_header(0, 0));
+  EXPECT_TRUE(!image::read_size(temp_path("zero.png")).valid());
+
+  for (const char* name : {"pic.png", "pic.gif", "pic.jpg", "huffman.jpg",
+                           "notpic.txt", "zero.png"}) {
+    std::remove(temp_path(name).c_str());
+  }
+}
+
+void test_image_fit() {
+  // Cells are twice as tall as they are wide, so a 3:2 picture given 8 rows
+  // wants 8 * 1.5 * 2 = 24 columns.
+  const image::Size three_by_two{240, 160};
+  image::Placement box = image::fit(three_by_two, 40, 8, 2.0);
+  EXPECT_EQ(box.columns, 24);
+  EXPECT_EQ(box.rows, 8);
+
+  // The same picture in a frame too narrow for it loses rows rather than
+  // getting squashed -- the terminal stretches to fill whatever box it is
+  // given, so keeping the proportions is this function's whole job.
+  box = image::fit(three_by_two, 12, 8, 2.0);
+  EXPECT_EQ(box.columns, 12);
+  EXPECT_EQ(box.rows, 4);
+
+  // A 4:1 panorama is width-constrained in any sensible frame.
+  box = image::fit({480, 120}, 26, 8, 2.0);
+  EXPECT_EQ(box.columns, 26);
+  EXPECT_EQ(box.rows, 3);
+
+  // A square in square cells is square.
+  box = image::fit({100, 100}, 40, 10, 1.0);
+  EXPECT_EQ(box.columns, 10);
+  EXPECT_EQ(box.rows, 10);
+
+  // Extreme ratios still get a box with area in it, because a box with a zero
+  // side draws nothing and would be reserved space showing an empty hole.
+  box = image::fit({4000, 3}, 20, 6, 2.0);
+  EXPECT_TRUE(box.columns >= 1);
+  EXPECT_TRUE(box.rows >= 1);
+  box = image::fit({3, 4000}, 20, 6, 2.0);
+  EXPECT_TRUE(box.columns >= 1);
+  EXPECT_TRUE(box.rows >= 1);
+
+  // Nonsense in, empty box out -- never a division by zero.
+  EXPECT_TRUE(image::fit({0, 0}, 40, 8, 2.0).empty());
+  EXPECT_TRUE(image::fit(three_by_two, 0, 8, 2.0).empty());
+  EXPECT_TRUE(image::fit(three_by_two, 40, 0, 2.0).empty());
+  EXPECT_TRUE(image::fit(three_by_two, 40, 8, 0.0).empty());
+}
+
+void test_image_protocol() {
+  // The environment wins, which is what lets a golden transcript pin what the
+  // terminal is allowed to be able to do.
+  setenv("FLASHTERM_IMAGE", "none", 1);
+  EXPECT_TRUE(image::detect() == image::Protocol::kNone);
+  EXPECT_TRUE(!image::available());
+  EXPECT_EQ(image::protocol_name(), std::string("none"));
+
+  setenv("FLASHTERM_IMAGE", "kitty", 1);
+  EXPECT_TRUE(image::detect() == image::Protocol::kKitty);
+  EXPECT_TRUE(image::available());
+  EXPECT_EQ(image::protocol_name(), std::string("kitty"));
+
+  // Spelling and spacing are the user's business, not a reason to fail.
+  setenv("FLASHTERM_IMAGE", "  KITTY  ", 1);
+  EXPECT_TRUE(image::detect() == image::Protocol::kKitty);
+  setenv("FLASHTERM_IMAGE", "off", 1);
+  EXPECT_TRUE(image::detect() == image::Protocol::kNone);
+
+  // Drawing writes the escape sequence that names the file rather than the
+  // file's contents: about sixty bytes whatever the picture weighs.
+  setenv("FLASHTERM_IMAGE", "kitty", 1);
+  std::ostringstream out;
+  EXPECT_TRUE(image::draw("images/dog.png", {24, 8}, 20, out));
+  const std::string drawn = out.str();
+  EXPECT_TRUE(drawn.size() < 100);
+  EXPECT_TRUE(drawn.find("c=24,r=8") != std::string::npos);
+  // C=1 keeps the cursor where it was, which is what lets the caller draw a
+  // frame first and drop the picture into it. Nothing else in the sequence may
+  // move it either: the frame walks back down by a count it worked out before
+  // drawing, so a stray cursor move here would put the rest of the card in the
+  // wrong place.
+  EXPECT_TRUE(drawn.find("C=1") != std::string::npos);
+  EXPECT_TRUE(drawn.find("\033[") == std::string::npos);
+  // base64("images/dog.png")
+  EXPECT_TRUE(drawn.find("aW1hZ2VzL2RvZy5wbmc=") != std::string::npos);
+
+  // Nothing is drawn without somewhere to draw it, or anywhere to draw from.
+  std::ostringstream empty;
+  EXPECT_TRUE(!image::draw("images/dog.png", {0, 8}, 20, empty));
+  EXPECT_TRUE(!image::draw("", {24, 8}, 20, empty));
+  EXPECT_TRUE(empty.str().empty());
+
+  setenv("FLASHTERM_IMAGE", "none", 1);
+  std::ostringstream silent;
+  EXPECT_TRUE(!image::draw("images/dog.png", {24, 8}, 20, silent));
+  EXPECT_TRUE(silent.str().empty());
+}
+
+void test_image_terminal_detection() {
+  unsetenv("FLASHTERM_IMAGE");
+  const char* had_term = std::getenv("TERM");
+  const std::string saved_term = (had_term == nullptr) ? "" : had_term;
+
+  // The terminals that say what they are in $TERM.
+  setenv("TERM", "xterm-kitty", 1);
+  EXPECT_TRUE(image::detect() == image::Protocol::kKitty);
+  setenv("TERM", "xterm-ghostty", 1);
+  EXPECT_TRUE(image::detect() == image::Protocol::kKitty);
+
+  // The regression this exists for. $TERM_PROGRAM is inherited rather than set
+  // per session, so it survives into a multiplexer, an ssh session, a nested
+  // terminal or a screen recorder -- all of which may draw nothing at all.
+  // Believing it reserved room in the card frame and then left a hole in it.
+  setenv("TERM", "xterm-256color", 1);
+  setenv("TERM_PROGRAM", "ghostty", 1);
+  setenv("KITTY_WINDOW_ID", "1", 1);
+  EXPECT_TRUE(image::detect() != image::Protocol::kKitty);
+  unsetenv("TERM_PROGRAM");
+  unsetenv("KITTY_WINDOW_ID");
+
+  // And the environment still overrides the lot, in both directions.
+  setenv("FLASHTERM_IMAGE", "kitty", 1);
+  EXPECT_TRUE(image::detect() == image::Protocol::kKitty);
+  setenv("TERM", "xterm-kitty", 1);
+  setenv("FLASHTERM_IMAGE", "none", 1);
+  EXPECT_TRUE(image::detect() == image::Protocol::kNone);
+
+  if (saved_term.empty()) {
+    unsetenv("TERM");
+  } else {
+    setenv("TERM", saved_term.c_str(), 1);
+  }
+  setenv("FLASHTERM_IMAGE", "none", 1);
+}
+
+void test_card_image_column() {
+  Flashcard card("el perro", "the dog", {"animals"});
+  card.id = "card0000000000001";
+  card.image = "images/perro.png";
+
+  // A card with a picture and no recording still writes the empty audio
+  // column, because position is what names a field in a CSV.
+  const std::string line = card_to_csv(card);
+  EXPECT_EQ(line, std::string("el perro,the dog,animals,0,0,1,,,"
+                              "card0000000000001,,images/perro.png"));
+
+  Flashcard parsed("", "");
+  EXPECT_TRUE(card_from_csv(line, &parsed));
+  EXPECT_EQ(parsed.image, std::string("images/perro.png"));
+  EXPECT_TRUE(parsed.audio.empty());
+
+  // A deck with neither still comes out exactly as every earlier version
+  // wrote it, which is what keeps a synced deck out of conflict.
+  Flashcard plain("q", "a");
+  plain.id = "card0000000000002";
+  EXPECT_EQ(card_to_csv(plain),
+            std::string("q,a,,0,0,1,,,card0000000000002"));
+
+  // And a deck written before pictures existed simply has no eleventh field.
+  Flashcard old_card("", "");
+  EXPECT_TRUE(card_from_csv("q,a,,0,0,1,,,someid,audio/q.wav", &old_card));
+  EXPECT_EQ(old_card.audio, std::string("audio/q.wav"));
+  EXPECT_TRUE(old_card.image.empty());
+
+  // The picture resolves against the deck, not the working directory.
+  Deck deck("decks/spanish.txt");
+  deck.add(card);
+  EXPECT_EQ(deck.image_path(deck.cards()[0]),
+            std::string("decks/images/perro.png"));
+}
+
 void test_summarize() {
   const int today_days = today();
 
@@ -1992,6 +2232,11 @@ int main() {
   test_event_log_rewrite();
   test_absorb_conflicts();
   test_absorb_conflicts_undo();
+  test_image_dimensions();
+  test_image_fit();
+  test_image_protocol();
+  test_image_terminal_detection();
+  test_card_image_column();
   test_summarize();
   test_card_ids();
   test_wrap();

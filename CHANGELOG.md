@@ -3,6 +3,24 @@
 Notable changes per release. Dates are the release date; the PR numbers link the
 detail, which is where the reasoning lives.
 
+## Unreleased
+
+### Added
+
+- **`--absorb-conflicts`,** which merges the sync-conflict copies a file-sync
+  client leaves beside the review log back into it, and brings the deck's
+  counters and due dates up to date with the reviews they contain. Two machines
+  reviewing before they sync no longer costs one side's scheduling: the log is
+  append-only, so neither copy is wrong, and the two are simply unioned by event
+  id. Syncthing's, Dropbox's and Nextcloud's naming schemes are recognised, and
+  the copies are read and left in place rather than deleted.
+
+  This is what `merge_events()` and `replay()` have been waiting for since #8.
+  The question that kept `replay()` unwired — how replayed state should meet
+  counters that predate the log — is answered by replaying the log twice, before
+  the merge and after it, and applying only the difference. A deck whose history
+  began before the log keeps it.
+
 ## 0.2.0 — 2026-08-17
 
 Audio, a second test suite, and a review screen that fits in a terminal.

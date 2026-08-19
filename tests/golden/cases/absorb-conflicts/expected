@@ -1,0 +1,27 @@
+--- output ---
+Reading 1 sync-conflict copy of deck.txt.log:
+  deck.txt.sync-conflict-20260818-101112-K3JQ7ZP.log: 4 events
+Absorbed 3 new events into deck.txt.log, now 4 events.
+  el perro                          +1 correct, box 2 -> 3, due <DATE1>
+  la casa                           +1 incorrect, due <DATE2>
+Updated 2 cards in deck.txt.
+1 card named by those events is not in this deck.
+Its events stay in the log, and will count once the deck catches up.
+The copy was left in place. Delete when you are happy with the result:
+  rm deck.txt.sync-conflict-20260818-101112-K3JQ7ZP.log
+--- exit status ---
+0
+--- file deck.txt ---
+el perro,the dog,animals,2,0,3,<DATE3>,<DATE1>,card0000000000001
+la casa,the house,home,0,1,1,<DATE3>,<DATE2>,card0000000000002
+el gato,the cat,animals,3,1,3,<DATE4>,<DATE5>,card0000000000003
+--- file deck.txt.log ---
+<ID1>,card0000000000001,<TIME>,n,correct,1,2,
+<ID2>,card0000000000001,<TIME>,n,correct,2,3,
+<ID3>,card0000000000002,<TIME>,n,incorrect,1,1,
+<ID4>,card0000000000009,<TIME>,n,correct,1,2,
+--- file deck.txt.sync-conflict-20260818-101112-K3JQ7ZP.log ---
+<ID1>,card0000000000001,<TIME>,n,correct,1,2,
+<ID2>,card0000000000001,<TIME>,n,correct,2,3,
+<ID3>,card0000000000002,<TIME>,n,incorrect,1,1,
+<ID4>,card0000000000009,<TIME>,n,correct,1,2,

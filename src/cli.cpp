@@ -4,6 +4,9 @@
 
 namespace FlashTerm {
 namespace {
+constexpr char kOneModeOnly[] =
+    "--generate-audio and --absorb-conflicts cannot be combined";
+
 CliOptions error(const std::string& message) {
   CliOptions options;
   options.action = CliAction::Error;
@@ -34,13 +37,23 @@ Usage:
                           Run it without --voice to be shown which ones are
                           installed and how to get more.
 
+  FlashTerm [deck] --absorb-conflicts
+                          Merge the sync-conflict copies your file-sync tool
+                          left beside the deck's review log back into it, and
+                          bring the deck's counters and due dates up to date
+                          with the reviews they contain. Reads the copies and
+                          leaves them alone; running it twice finds nothing the
+                          second time.
+
 The deck is created if it does not exist, and saved after every answer and
 edit, so interrupting a session costs nothing. Import a starter deck from
 examples/ with menu option 5.
 
 Every answer is also appended to a review log beside the deck, named after it
 with ".log" added, which is where the streak and review-count statistics on the
-progress screen come from.
+progress screen come from. Because it is only ever appended to, two machines
+reviewing before they sync produce two complete halves of one history rather
+than a lost one -- which is what --absorb-conflicts puts back together.
 
 Menus take a single keypress when run in a terminal, and fall back to reading
 whole lines when input is piped, so scripting still works.
@@ -83,6 +96,10 @@ CliOptions parse_args(int argc, const char* const argv[],
   CliOptions options;
   bool options_ended = false;
   bool have_deck = false;
+  // Each of these does one thing to a deck and exits, so two of them is not a
+  // request that can be honoured -- and picking the last one silently would
+  // skip whichever the user typed first.
+  bool mode_given = false;
 
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
@@ -103,7 +120,15 @@ CliOptions parse_args(int argc, const char* const argv[],
       // Unlike --help and --version these do not return immediately: both are
       // about a deck, so the rest of the command line still has to be read.
       if (arg == "--generate-audio") {
+        if (mode_given) return error(kOneModeOnly);
         options.action = CliAction::GenerateAudio;
+        mode_given = true;
+        continue;
+      }
+      if (arg == "--absorb-conflicts") {
+        if (mode_given) return error(kOneModeOnly);
+        options.action = CliAction::AbsorbConflicts;
+        mode_given = true;
         continue;
       }
       if (arg == "--force") {

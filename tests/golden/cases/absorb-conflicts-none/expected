@@ -1,0 +1,10 @@
+--- output ---
+No sync-conflict copies of deck.txt.log to absorb.
+--- exit status ---
+0
+--- file deck.txt ---
+el perro,the dog,animals,1,0,2,<DATE1>,<DATE2>,card0000000000001,
+--- file deck.txt.log ---
+<ID1>,card0000000000001,<TIME>,n,correct,1,2,
+--- file deck.txt.log.bak ---
+<ID1>,card0000000000001,<TIME>,n,correct,1,2,

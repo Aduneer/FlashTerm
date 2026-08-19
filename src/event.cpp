@@ -228,6 +228,39 @@ bool EventLog::append(const ReviewEvent& event, std::string* error) {
   return true;
 }
 
+bool EventLog::rewrite(const std::vector<ReviewEvent>& events,
+                       std::string* error) {
+  const std::string tmp_path = path_ + ".tmp";
+
+  {
+    std::ofstream file(tmp_path);
+    if (!file) {
+      if (error) *error = "cannot write " + tmp_path + ": " + errno_message();
+      return false;
+    }
+    for (const auto& event : events) {
+      file << event_to_csv(event) << "\n";
+    }
+    file.flush();
+    if (!file) {
+      if (error) *error = "failed writing " + tmp_path;
+      file.close();
+      std::remove(tmp_path.c_str());
+      return false;
+    }
+  }
+
+  if (std::rename(tmp_path.c_str(), path_.c_str()) != 0) {
+    if (error) *error = "cannot replace " + path_ + ": " + errno_message();
+    std::remove(tmp_path.c_str());
+    return false;
+  }
+  // Only after the rename, so a failed rewrite leaves the object describing
+  // what is actually on disk rather than what was meant to be.
+  events_ = events;
+  return true;
+}
+
 std::vector<ReviewEvent> merge_events(const std::vector<ReviewEvent>& a,
                                       const std::vector<ReviewEvent>& b) {
   std::map<std::string, ReviewEvent> by_id;

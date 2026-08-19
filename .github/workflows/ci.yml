@@ -9,14 +9,48 @@ on:
 
 jobs:
   build-and-test:
+    # Two compilers times two build modes, so four jobs.
+    #
     # Both compilers, so a warning or a standard-library difference that only
     # one of them notices still fails the build.
+    #
+    # Both modes, because -O2 and the sanitizers do not see the same program:
+    # the optimised build is what ships, and the sanitised one is the only
+    # thing that reports a read past the end of a buffer rather than returning
+    # whatever was next to it.
     strategy:
       fail-fast: false
       matrix:
         cxx: [g++, clang++]
+        mode: [optimised, sanitised]
+        include:
+          # -Werror lives here rather than in the Makefile on purpose: a
+          # warning should stop a change being merged, not stop a contributor
+          # building the thing at all. `make` on a clean checkout stays warm.
+          - mode: optimised
+            cxxflags: -std=c++17 -O2 -Wall -Wextra -Werror
+
+          # -fno-sanitize-recover=undefined is what makes this entry mean
+          # anything. UBSan's default is to print the diagnostic and carry on,
+          # exiting 0 -- so without it, a real finding is a green build and
+          # nobody reads the log of a job that passed.
+          - mode: sanitised
+            cxxflags: >-
+              -std=c++17 -O1 -g -Wall -Wextra -Werror
+              -fsanitize=address,undefined -fno-sanitize-recover=undefined
+              -fno-omit-frame-pointer
 
     runs-on: ubuntu-latest
+
+    # Set for the job rather than passed to each make: the Makefile takes both
+    # with ?=, and the test and golden targets have to be built with the same
+    # flags as the objects they link against, which is easy to get wrong one
+    # step at a time.
+    env:
+      CXX: ${{ matrix.cxx }}
+      CXXFLAGS: ${{ matrix.cxxflags }}
+      # Names the source line rather than an address when something does fire.
+      UBSAN_OPTIONS: print_stacktrace=1
 
     steps:
       - uses: actions/checkout@v4
@@ -25,10 +59,10 @@ jobs:
         run: ${{ matrix.cxx }} --version
 
       - name: Build
-        run: make CXX=${{ matrix.cxx }}
+        run: make
 
       - name: Run tests
-        run: make test CXX=${{ matrix.cxx }}
+        run: make test
 
       - name: Run golden end-to-end tests
-        run: make golden CXX=${{ matrix.cxx }}
+        run: make golden

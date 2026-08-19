@@ -21,6 +21,19 @@ detail, which is where the reasoning lives.
   the merge and after it, and applying only the difference. A deck whose history
   began before the log keeps it.
 
+### Changed
+
+- **CI builds under the sanitizers and with `-Werror`,** as a four-way matrix of
+  both compilers against an optimised and a sanitised build. Every pull request
+  so far was checked under `-fsanitize=address,undefined` by hand and came back
+  clean, which is the argument for making it a job rather than a habit.
+
+  `-Werror` is deliberately not in the Makefile: a warning should stop a change
+  being merged, not stop a contributor building the project at all. The
+  sanitised entry also compiles with `-fno-sanitize-recover=undefined`, without
+  which UBSan prints its diagnostic and exits 0 — so a real finding would have
+  been a green build that nobody reads the log of.
+
 ## 0.2.0 — 2026-08-17
 
 Audio, a second test suite, and a review screen that fits in a terminal.

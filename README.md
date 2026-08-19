@@ -544,7 +544,7 @@ cannot drive an app that insists on a tty.
 
 ## Contributing
 
-Issues and pull requests are welcome. `make check` should pass before you open one; CI runs both suites on gcc and clang.
+Issues and pull requests are welcome. `make check` should pass before you open one; CI runs both suites on gcc and clang, in an optimised build and again under `-fsanitize=address,undefined`, all four with `-Werror`. Warnings are deliberately not errors in the Makefile itself, so a warning never stops you building — it stops the change being merged.
 
 Released versions and what changed in them are in [CHANGELOG.md](CHANGELOG.md).
 

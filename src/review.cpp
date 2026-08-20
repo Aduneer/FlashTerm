@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <functional>
 #include <iomanip>
@@ -87,6 +88,51 @@ std::mt19937::result_type chosen_seed() {
 std::mt19937& rng() {
   static std::mt19937 generator(chosen_seed());
   return generator;
+}
+
+// An index in [0, bound), drawn by hand rather than with
+// std::uniform_int_distribution, whose mapping from generator output to result
+// is not specified and does differ between standard libraries. See
+// deterministic_shuffle.
+//
+// Rejection sampling: mt19937 covers the whole 32-bit range, so draws from the
+// last, short block above the largest exact multiple of `bound` are discarded
+// rather than folded in, which would make the low values fractionally likelier.
+std::uint32_t bounded(std::uint32_t bound) {
+  const std::uint64_t range = std::uint64_t{1} << 32;
+  const std::uint64_t limit = range - (range % bound);
+  std::uint64_t draw;
+  do {
+    draw = rng()();
+  } while (draw >= limit);
+  return static_cast<std::uint32_t>(draw % bound);
+}
+
+// Fisher-Yates, written out rather than calling std::shuffle.
+//
+// std::shuffle's output is not specified by the standard -- only that the
+// result is a uniformly random permutation -- so libstdc++ and libc++ produce
+// *different orders from the same seed*. FLASHTERM_SEED is documented as
+// fixing the review order, and a promise that holds only on the standard
+// library you happened to build against is not the promise it makes. The
+// golden suite is what noticed: every multi-card case failed on macOS, because
+// a scripted session answers cards in the order it expects to meet them, and
+// the transcripts were recorded against libstdc++.
+//
+// mt19937 itself is safe to keep -- the standard specifies its algorithm
+// exactly, down to a required value for the 10000th draw -- so pinning the
+// permutation is only a matter of not letting the library choose how the
+// numbers become indices.
+template <typename Iterator>
+void deterministic_shuffle(Iterator first, Iterator last) {
+  const std::size_t count = static_cast<std::size_t>(last - first);
+  for (std::size_t i = count; i > 1; --i) {
+    const std::size_t pick = bounded(static_cast<std::uint32_t>(i));
+    if (pick != i - 1) {
+      std::iter_swap(first + static_cast<std::ptrdiff_t>(i - 1),
+                     first + static_cast<std::ptrdiff_t>(pick));
+    }
+  }
 }
 
 int clamp_box(int box) { return std::min(kMaxBox, std::max(1, box)); }
@@ -273,7 +319,7 @@ void order_by_box(CardRefs* refs) {
   }
   refs->clear();
   for (int box = 1; box <= kMaxBox; ++box) {
-    std::shuffle(boxes[box].begin(), boxes[box].end(), rng());
+    deterministic_shuffle(boxes[box].begin(), boxes[box].end());
     refs->insert(refs->end(), boxes[box].begin(), boxes[box].end());
   }
 }
@@ -651,7 +697,7 @@ void review_flashcards(Deck& deck) {
     return;
   }
 
-  std::shuffle(matches.begin(), matches.end(), rng());
+  deterministic_shuffle(matches.begin(), matches.end());
   if (session.mode == kModeBox && filters.leitner_box == 0) {
     order_by_box(&matches);
   } else if (filters.due_only) {

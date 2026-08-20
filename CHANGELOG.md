@@ -5,6 +5,22 @@ detail, which is where the reasoning lives.
 
 ## Unreleased
 
+### Fixed
+
+- **`FLASHTERM_SEED` now fixes the review order on every platform, not just the
+  one you built on.** The shuffle went through `std::shuffle`, whose output the
+  standard does not specify — only that the permutation is uniformly random —
+  so libstdc++ and libc++ deal the same seeded deck in different orders. It is
+  now an explicit Fisher–Yates over `std::mt19937`, whose own output *is*
+  specified exactly, so the seed alone decides the order.
+
+  Found by the macOS runner below, on its first run, which is the entire
+  argument for having added it: every multi-card golden case failed there,
+  because a scripted session answers cards in the order it expects to meet
+  them and the transcripts were recorded against libstdc++. Nothing was wrong
+  with the shuffle's randomness, and no real session is affected — the bug was
+  in what the seed promised.
+
 ### Changed
 
 - **CI builds and tests on macOS as well as Linux.** Everything FlashTerm does

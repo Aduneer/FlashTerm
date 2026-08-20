@@ -1,2 +1,1 @@
-FLASHTERM_TTS=/bin/false
-FLASHTERM_PLAYER=/bin/false
+FAKE_AUDIO_FAIL=1

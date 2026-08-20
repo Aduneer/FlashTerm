@@ -63,8 +63,12 @@ emit_files() {
     # multibyte data" that makes one awk behave differently from another.
     # Detected by looking for a NUL, which is what every "is this text" check
     # has always come down to.
-    size=$(wc -c <"$file")
-    stripped=$(LC_ALL=C tr -d '\000' <"$file" | wc -c)
+    # wc pads its count with leading spaces on a BSD userland, so on macOS the
+    # size reached the transcript as "<binary,      597 bytes>". Stripped
+    # rather than reformatted, since this has to stay a plain integer for the
+    # comparison below as much as for the printf above it.
+    size=$(wc -c <"$file" | tr -d '[:space:]')
+    stripped=$(LC_ALL=C tr -d '\000' <"$file" | wc -c | tr -d '[:space:]')
     if [ "$size" -ne "$stripped" ]; then
       printf -- '<binary, %s bytes>\n' "$size"
       continue

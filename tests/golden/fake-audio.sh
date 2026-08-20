@@ -15,6 +15,20 @@
 #
 # Called as `fake-audio.sh speak <text>`, `fake-audio.sh play <file>`, or
 # `fake-audio.sh render <file>` with the text on standard input.
+#
+# FAKE_AUDIO_FAIL makes it report that it could not play, which is the only way
+# a case can reach the "No audio available for this card" path. It exists
+# because the alternative -- pointing FLASHTERM_TTS at a command that always
+# fails -- is a fact about the machine rather than about FlashTerm, and it was
+# wrong: the case named /bin/false, which does not exist on macOS, where
+# `false` lives in /usr/bin. FlashTerm rejects an override it cannot execute
+# and falls back to the built-in list, so the case quietly stopped testing a
+# failure at all and was answered by macOS's own `say` instead. Nothing is
+# recorded here, because nothing played.
+
+if [ -n "${FAKE_AUDIO_FAIL:-}" ]; then
+  exit 1
+fi
 
 kind=$1
 shift

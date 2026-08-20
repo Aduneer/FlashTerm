@@ -9,7 +9,8 @@ on:
 
 jobs:
   build-and-test:
-    # Two compilers times two build modes, so four jobs.
+    # Two platforms, two compilers and two build modes, minus a combination
+    # that would be a duplicate, so six jobs.
     #
     # Both compilers, so a warning or a standard-library difference that only
     # one of them notices still fails the build.
@@ -18,11 +19,26 @@ jobs:
     # the optimised build is what ships, and the sanitised one is the only
     # thing that reports a read past the end of a buffer rather than returning
     # whatever was next to it.
+    #
+    # Both platforms, because everything the app does outside the standard
+    # library is POSIX rather than Linux -- termios, ioctl, dirent, wcwidth --
+    # and "should be portable" is a claim nobody had checked. The macOS runner
+    # is Apple Silicon, so it also builds for arm64, where `char` is unsigned
+    # by default and x86 says it is signed. That is a real class of bug this
+    # cannot otherwise see.
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         cxx: [g++, clang++]
         mode: [optimised, sanitised]
+        exclude:
+          # `g++` on a macOS runner is a shim for Apple clang rather than GCC,
+          # so this pair would run the clang entry again under another name.
+          # Real GCC is a `brew install` away; what the macOS runner is here to
+          # catch is the platform, not a third compiler.
+          - os: macos-latest
+            cxx: g++
         include:
           # -Werror lives here rather than in the Makefile on purpose: a
           # warning should stop a change being merged, not stop a contributor
@@ -40,7 +56,7 @@ jobs:
               -fsanitize=address,undefined -fno-sanitize-recover=undefined
               -fno-omit-frame-pointer
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     # Set for the job rather than passed to each make: the Makefile takes both
     # with ?=, and the test and golden targets have to be built with the same

@@ -12,7 +12,10 @@ FlashTerm is a terminal flashcard app that makes you type the answer. No multipl
 
 ## Quick Start
 
-Needs a C++17 compiler (`g++` or `clang++`) and `make`.
+Needs a C++17 compiler (`g++` or `clang++`) and `make`. Linux and macOS are
+both built and tested on every change; anything else POSIX will very likely
+work, since nothing outside the standard library is used that POSIX does not
+define.
 
 ```bash
 git clone https://github.com/Aduneer/FlashTerm
@@ -633,7 +636,7 @@ cannot drive an app that insists on a tty.
 
 ## Contributing
 
-Issues and pull requests are welcome. `make check` should pass before you open one; CI runs both suites on gcc and clang, in an optimised build and again under `-fsanitize=address,undefined`, all four with `-Werror`. Warnings are deliberately not errors in the Makefile itself, so a warning never stops you building — it stops the change being merged.
+Issues and pull requests are welcome. `make check` should pass before you open one; CI runs both suites on Linux and macOS, on gcc and clang, in an optimised build and again under `-fsanitize=address,undefined`, all of them with `-Werror`. Warnings are deliberately not errors in the Makefile itself, so a warning never stops you building — it stops the change being merged.
 
 Released versions and what changed in them are in [CHANGELOG.md](CHANGELOG.md).
 

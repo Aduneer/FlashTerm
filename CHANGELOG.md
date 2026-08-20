@@ -3,6 +3,24 @@
 Notable changes per release. Dates are the release date; the PR numbers link the
 detail, which is where the reasoning lives.
 
+## Unreleased
+
+### Changed
+
+- **CI builds and tests on macOS as well as Linux.** Everything FlashTerm does
+  outside the standard library is POSIX rather than Linux — `termios`, `ioctl`,
+  `dirent`, `wcwidth` — and the time functions have had their `gmtime_r` and
+  `localtime_r` branches since the log landed, so this was expected to pass.
+  Expected is not tested, and "runs on a Mac" is the kind of claim a README
+  should not make on the strength of reading the source.
+
+  The macOS runner is Apple Silicon, so it also builds for arm64. That is the
+  half worth having beyond the platform itself: `char` is unsigned there and
+  signed on x86, which is a real difference that no amount of running on one
+  architecture can show. `g++` on macOS is a shim for Apple clang rather than
+  GCC, so that pair is excluded rather than run as a second clang under another
+  name — six jobs, not eight.
+
 ## 0.3.0 — 2026-08-19
 
 Pictures on cards, sync that puts two machines' reviews back together, and a CI

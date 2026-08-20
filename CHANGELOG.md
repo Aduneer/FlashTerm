@@ -7,6 +7,35 @@ detail, which is where the reasoning lives.
 
 ### Fixed
 
+- **Opening a deck no longer rewrites it.** Studying any deck in `examples/`
+  straight from a clone left it modified in `git status` without a single card
+  having been answered, which looks like the app corrupting its own sample data
+  and is an easy way to get surprise diffs.
+
+  Two separate causes, both of which had to go:
+
+  - Every card was given an `id` when the deck was *loaded*. An id is what a
+    log event names a card by, so a card needs one at the moment something is
+    recorded against it — and a deck that is only read has nothing recorded
+    against it. Ids are now minted at that moment instead. Answered cards are
+    unaffected: the id still exists before the event that names it is written,
+    which is the invariant that matters.
+  - Saving expanded every row to its full width, so a hand-written
+    `question,answer,tags` deck came back as `question,answer,tags,0,0,1,,,id`.
+    Cards are now written only as far as the last column they actually use.
+    That rule already existed for the `audio` and `image` columns, for exactly
+    this reason; it now covers the whole row rather than the last two.
+
+  A save that would reproduce the file byte for byte is also skipped outright.
+  Saving is unconditional at every call site — after every answer, after every
+  edit, and on the way out — which is deliberate and is what makes an
+  interrupted session cost nothing; it just should not mean that reading a deck
+  counts as writing it.
+
+  Nothing about what a deck can contain has changed, and every deck written by
+  an earlier version still loads and still saves identically once a card in it
+  has been reviewed.
+
 - **`FLASHTERM_SEED` now fixes the review order on every platform, not just the
   one you built on.** The shuffle went through `std::shuffle`, whose output the
   standard does not specify — only that the permutation is uniformly random —

@@ -88,9 +88,10 @@ GenerateResult generate_audio(Deck& deck, const std::string& voice, bool force,
     return result;
   }
 
-  // A card is named by its id, so every card needs one before anything can be
-  // written. Loading a deck normally mints them; a deck loaded and immediately
-  // generated from may not have been through that yet.
+  // A recording is named after the card's id, so every card needs one before
+  // anything can be written. Loading a deck no longer mints them -- reading a
+  // deck leaves it alone, see Deck::ensure_id -- so this is where a whole
+  // deck's worth gets minted, and the deck is about to be written anyway.
   deck.ensure_ids();
 
   const std::string directory = deck.resolve(kAudioDirectory);

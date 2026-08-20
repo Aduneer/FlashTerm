@@ -65,5 +65,5 @@ Nothing matches "zzz".
 --- exit status ---
 0
 --- file deck.txt ---
-Bonjour,Hello,french;greeting,0,0,1,,,<ID1>
-Merci,Thanks|Thank you,french,0,0,1,,,<ID2>
+Bonjour,Hello,french;greeting
+Merci,Thanks|Thank you,french

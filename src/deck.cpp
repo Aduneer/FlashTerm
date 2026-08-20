@@ -6,6 +6,7 @@
 #include <cstring>
 #include <fstream>
 #include <set>
+#include <sstream>
 #include <utility>
 
 #include "date.h"
@@ -30,28 +31,58 @@ std::string errno_message() {
 }  // namespace
 
 std::string card_to_csv(const Flashcard& card) {
-  const std::string row =
-      escape_csv_field(card.question) + "," + escape_csv_field(card.answer) +
-      "," + escape_csv_field(card.tags_to_string()) + "," +
-      std::to_string(card.times_correct) + "," +
-      std::to_string(card.times_incorrect) + "," +
-      std::to_string(card.leitner_box) + "," +
-      format_date(card.last_reviewed) + "," + format_date(card.due_date) + "," +
-      escape_csv_field(card.id);
+  const std::string columns[] = {
+      escape_csv_field(card.question),
+      escape_csv_field(card.answer),
+      escape_csv_field(card.tags_to_string()),
+      std::to_string(card.times_correct),
+      std::to_string(card.times_incorrect),
+      std::to_string(card.leitner_box),
+      format_date(card.last_reviewed),
+      format_date(card.due_date),
+      escape_csv_field(card.id),
+      escape_csv_field(card.audio),
+      escape_csv_field(card.image),
+  };
 
-  // Written only as far as the last column the card actually uses. A deck with
-  // no audio and no pictures -- which is most decks -- then comes out byte for
-  // byte as every earlier version wrote it. That matters because decks are
-  // synced between machines as plain files: a trailing comma on every line
-  // would put the whole deck in conflict the first time one machine saved it
-  // and the other had not updated yet.
+  // What card_from_csv fills in for a column that is not there at all. A
+  // column holding exactly this says nothing the reader would not have assumed
+  // anyway, so writing it is optional -- which is the whole basis of the trim
+  // below, and the reason these two lists have to stay in step.
+  static const char* const kAbsent[] = {"", "", "",  "0", "0", "1",
+                                        "", "", "",  "",  ""};
+  const std::size_t count = sizeof(columns) / sizeof(columns[0]);
+
+  // Written only as far as the last column the card actually uses. A deck of
+  // plain question,answer,tags rows -- which is what every deck in examples/
+  // is, and what anyone writing one by hand produces -- comes back out in that
+  // form rather than being expanded to the full eleven. Without this, opening
+  // such a deck and closing it rewrote every line of it.
   //
-  // A card with a picture and no recording still has to write the empty audio
-  // column, since position is what names a field in a CSV.
-  if (card.audio.empty() && card.image.empty()) return row;
-  const std::string with_audio = row + "," + escape_csv_field(card.audio);
-  if (card.image.empty()) return with_audio;
-  return with_audio + "," + escape_csv_field(card.image);
+  // It is also what keeps a deck byte for byte as an earlier version wrote it,
+  // which matters because decks are synced between machines as plain files: a
+  // trailing comma on every line would put the whole deck in conflict the
+  // first time one machine saved it and the other had not updated yet. The
+  // audio and image columns were the first to need this and are now simply the
+  // last two cases of the general rule.
+  //
+  // Trailing, not any: a card with a picture and no recording still writes the
+  // empty audio column, because position is what names a field in a CSV.
+  //
+  // Question, answer and tags are always written, even when the tags are
+  // empty. Three columns is the documented short form of a deck, and a
+  // two-column line, though it would read back correctly, is not a shape
+  // anything else in the project produces.
+  std::size_t last = 2;
+  for (std::size_t i = 3; i < count; ++i) {
+    if (columns[i] != kAbsent[i]) last = i;
+  }
+
+  std::string row = columns[0];
+  for (std::size_t i = 1; i <= last; ++i) {
+    row += "," + columns[i];
+  }
+  return row;
 }
 
 bool card_from_csv(const std::string& line, Flashcard* out) {
@@ -101,21 +132,57 @@ bool Deck::load() {
 
   std::ifstream file(path_);
   if (!file.is_open()) {
+    on_disk_.clear();
+    on_disk_known_ = false;
     return false;
   }
+
+  // Read whole rather than line by line, and kept, so that save() can answer
+  // "would writing this change the file?" against the actual bytes. Parsing
+  // then runs over the copy. Line-at-a-time reading cannot serve here: it
+  // silently drops blank lines and cannot tell whether the last line ended in
+  // a newline, and both of those are differences a save would write out.
+  std::ostringstream buffer;
+  buffer << file.rdbuf();
+  on_disk_ = buffer.str();
+  on_disk_known_ = true;
+
+  std::istringstream lines(on_disk_);
   std::string line;
-  while (std::getline(file, line)) {
+  while (std::getline(lines, line)) {
     if (trim(line).empty()) continue;
     Flashcard card("", "");
     if (card_from_csv(line, &card)) {
       cards_.push_back(card);
     }
   }
-  ensure_ids();
+
+  // Note that ids are deliberately *not* minted here; see Deck::ensure_id.
+  // Duplicate ids are likewise left alone, because a deck that is only read
+  // never uses them. import_into_deck resolves them, which is where they come
+  // from.
   return true;
 }
 
 bool Deck::save(std::string* error) const {
+  std::string content;
+  for (const auto& card : cards_) {
+    content += card_to_csv(card);
+    content += "\n";
+  }
+
+  // A write that would reproduce the file exactly is not a save. Every call
+  // site saves unconditionally -- after each answer, after each edit, and on
+  // the way out -- which is deliberate and is what makes an interrupted
+  // session cost nothing. The price was that opening a deck and closing it
+  // rewrote it, and for the decks in examples/ that meant a fresh clone could
+  // not be studied without the repository showing modified files.
+  //
+  // Cheaper than it looks, and cheaper than the write it replaces: the
+  // comparison is against a string already in memory, and the saves that do
+  // nothing are exactly the ones where the deck is large and untouched.
+  if (on_disk_known_ && content == on_disk_) return true;
+
   const std::string tmp_path = path_ + ".tmp";
 
   {
@@ -124,9 +191,7 @@ bool Deck::save(std::string* error) const {
       if (error) *error = "cannot write " + tmp_path + ": " + errno_message();
       return false;
     }
-    for (const auto& card : cards_) {
-      file << card_to_csv(card) << "\n";
-    }
+    file << content;
     file.flush();
     if (!file) {
       if (error) *error = "failed writing " + tmp_path;
@@ -141,6 +206,10 @@ bool Deck::save(std::string* error) const {
     std::remove(tmp_path.c_str());
     return false;
   }
+
+  // Only now, because a failed write leaves the file as it was.
+  on_disk_ = content;
+  on_disk_known_ = true;
   return true;
 }
 
@@ -159,6 +228,22 @@ void Deck::ensure_ids() {
       card.id = generate_id();
     } while (!taken.insert(card.id).second);
   }
+}
+
+const std::string& Deck::ensure_id(Flashcard& card) {
+  if (!card.id.empty()) return card.id;
+
+  // Collected per call rather than kept as a member: this runs when a card is
+  // answered for the first time since the log existed, which is once per card
+  // in the life of a deck and never in a loop.
+  std::set<std::string> taken;
+  for (const auto& other : cards_) {
+    if (!other.id.empty()) taken.insert(other.id);
+  }
+  do {
+    card.id = generate_id();
+  } while (!taken.insert(card.id).second);
+  return card.id;
 }
 
 bool Deck::remove(std::size_t index) {

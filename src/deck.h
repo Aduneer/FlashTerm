@@ -47,6 +47,12 @@ class Deck {
 
   // Writes to a temporary file and renames it into place, so an interrupted
   // or failed write can never leave a truncated deck behind.
+  //
+  // A write that would reproduce the file byte for byte is skipped and
+  // reported as success. Saving is unconditional at every call site -- after
+  // every answer, every edit, and on the way out -- which is what makes an
+  // interrupted session cost nothing; the cost is that merely opening a deck
+  // used to rewrite it. See the comment on the check itself.
   bool save(std::string* error = nullptr) const;
 
   const std::string& path() const { return path_; }
@@ -106,12 +112,36 @@ class Deck {
   // log existed, and duplicated ids arrive from re-importing an export into
   // the deck it came from — two cards sharing one history would make the log
   // ambiguous, so the newcomer is renamed rather than the incumbent.
+  //
+  // Deliberately not called by load(): see ensure_id.
   void ensure_ids();
+
+  // Gives one card an id if it has none, unique against the rest of the deck,
+  // and returns it.
+  //
+  // This exists so that load() does not have to mint ids for a whole deck just
+  // to open it. An id is what a log event names a card by, so a card needs one
+  // at the moment something is about to be recorded against it and not before
+  // — and a deck that is only read has nothing recorded against it at all.
+  // Minting on load meant that opening a deck changed it, which made studying
+  // a deck checked into a repository show up as a source change.
+  const std::string& ensure_id(Flashcard& card);
 
  private:
   std::string path_;
   std::vector<Flashcard> cards_;
   EventLog log_;
+
+  // What the file holds as of the last successful read or write, so that
+  // save() can tell a real change from a no-op. Mutable because save() is
+  // const to its callers and stays that way: what it records here is a fact
+  // about the file rather than about the deck.
+  //
+  // The flag is not the same question as an empty string: a deck file that
+  // does not exist yet still has to be created the first time it is saved,
+  // and an empty deck serialises to nothing.
+  mutable std::string on_disk_;
+  mutable bool on_disk_known_ = false;
 };
 
 // Appends the cards in `path` to `deck`, preserving review statistics when

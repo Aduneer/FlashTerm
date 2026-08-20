@@ -568,12 +568,16 @@ std::string log_event(Deck& deck, const ReviewEvent& event, bool* warned) {
   return event.id;
 }
 
-std::string log_answer(Deck& deck, const Flashcard& card, bool reversed,
+// Takes the card by mutable reference because writing an event is the moment
+// the card needs an id: a deck written before the log existed has none, and
+// ensure_id mints one here rather than on load so that reading a deck leaves
+// it alone.
+std::string log_answer(Deck& deck, Flashcard& card, bool reversed,
                        Outcome outcome, const AnswerResult& result,
                        bool* warned) {
   ReviewEvent event;
   event.id = generate_id();
-  event.card_id = card.id;
+  event.card_id = deck.ensure_id(card);
   event.timestamp = now_timestamp();
   event.direction = reversed ? 'r' : 'n';
   event.outcome = outcome;
@@ -582,11 +586,13 @@ std::string log_answer(Deck& deck, const Flashcard& card, bool reversed,
   return log_event(deck, event, warned);
 }
 
-void log_undo(Deck& deck, const Flashcard& card, const std::string& answer_id,
+// The card has an id by now, having just been answered; ensure_id is asked
+// anyway rather than assuming the order of two calls in another function.
+void log_undo(Deck& deck, Flashcard& card, const std::string& answer_id,
               bool* warned) {
   ReviewEvent event;
   event.id = generate_id();
-  event.card_id = card.id;
+  event.card_id = deck.ensure_id(card);
   event.timestamp = now_timestamp();
   event.undoes = answer_id;
   log_event(deck, event, warned);

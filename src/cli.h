@@ -4,7 +4,7 @@
 namespace FlashTerm {
 // Pre-1.0 on purpose: the deck format and review flow are still gaining
 // features, and 1.0.0 would promise a stability that is not being offered yet.
-inline constexpr char kVersion[] = "0.3.0";
+inline constexpr char kVersion[] = "0.3.1";
 
 // What the command line asked for. Anything that is not RunDeck is handled and
 // exited on immediately, before a deck is touched.

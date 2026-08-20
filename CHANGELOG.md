@@ -3,7 +3,11 @@
 Notable changes per release. Dates are the release date; the PR numbers link the
 detail, which is where the reasoning lives.
 
-## Unreleased
+## 0.3.1 — 2026-08-20
+
+Two fixes and a second platform. Nothing here changes what FlashTerm does or
+what a deck can hold; both fixes are things that were quietly already wrong,
+and one of them only a second standard library could show.
 
 ### Fixed
 
@@ -34,7 +38,7 @@ detail, which is where the reasoning lives.
 
   Nothing about what a deck can contain has changed, and every deck written by
   an earlier version still loads and still saves identically once a card in it
-  has been reviewed.
+  has been reviewed. (#25)
 
 - **`FLASHTERM_SEED` now fixes the review order on every platform, not just the
   one you built on.** The shuffle went through `std::shuffle`, whose output the
@@ -48,7 +52,7 @@ detail, which is where the reasoning lives.
   because a scripted session answers cards in the order it expects to meet
   them and the transcripts were recorded against libstdc++. Nothing was wrong
   with the shuffle's randomness, and no real session is affected — the bug was
-  in what the seed promised.
+  in what the seed promised. (#24)
 
 ### Changed
 
@@ -65,6 +69,17 @@ detail, which is where the reasoning lives.
   architecture can show. `g++` on macOS is a shim for Apple clang rather than
   GCC, so that pair is excluded rather than run as a second clang under another
   name — six jobs, not eight.
+
+  Two golden cases turned out to be able to observe the machine, which is the
+  same class as the bug that made `run.sh` pin the environment for every case
+  rather than per case. `wc` pads its count with leading spaces on a BSD
+  userland, so a binary fixture was described with the padding baked in. And
+  `review-audio-unplayable` reached the "no audio available" path by naming
+  `/bin/false`, which does not exist on macOS — `false` is in `/usr/bin` there
+  — so FlashTerm rejected an override it could not execute, fell back to the
+  built-in candidate list, and was answered by macOS's own `say`. The case had
+  stopped testing a failed playback at all; `fake-audio.sh` now fails on demand
+  via `FAKE_AUDIO_FAIL`. (#24)
 
 ## 0.3.0 — 2026-08-19
 

@@ -57,6 +57,16 @@ std::string temp_path(const std::string& name) {
   return "build/test-" + name;
 }
 
+// Whole-file, bytes as they are: a test about whether a file was rewritten
+// cannot read it a line at a time, since that is exactly what hides a
+// difference in trailing newlines.
+std::string file_contents(const std::string& path) {
+  std::ifstream file(path);
+  std::ostringstream buffer;
+  buffer << file.rdbuf();
+  return buffer.str();
+}
+
 void test_trim_and_case() {
   EXPECT_EQ(trim("  hello  "), std::string("hello"));
   EXPECT_EQ(trim("\t\r\n"), std::string(""));
@@ -1977,7 +1987,9 @@ void test_card_ids() {
 
   EXPECT_EQ(log, path + ".log");
 
-  // A deck written before ids existed gets them on load, and they stick.
+  // A deck written before ids existed keeps its cards id-less on load, because
+  // reading a deck does not change it. One is minted when something is about
+  // to be recorded against the card, and then it sticks.
   {
     std::ofstream file(path);
     file << "Q1,A1,tag,3,1,4,2026-08-01,2026-08-15\n"
@@ -1986,11 +1998,17 @@ void test_card_ids() {
   Deck deck(path);
   EXPECT_TRUE(deck.load());
   EXPECT_EQ(deck.size(), size_t{2});
-  EXPECT_TRUE(!deck.cards()[0].id.empty());
-  EXPECT_TRUE(!deck.cards()[1].id.empty());
-  EXPECT_TRUE(deck.cards()[0].id != deck.cards()[1].id);
+  EXPECT_TRUE(deck.cards()[0].id.empty());
+  EXPECT_TRUE(deck.cards()[1].id.empty());
 
-  const std::string first_id = deck.cards()[0].id;
+  const std::string first_id = deck.ensure_id(deck.cards()[0]);
+  EXPECT_TRUE(!first_id.empty());
+  // Asking again returns the same one rather than minting a second.
+  EXPECT_EQ(deck.ensure_id(deck.cards()[0]), first_id);
+  // Its neighbour is left alone until it is asked for, and then differs.
+  EXPECT_TRUE(deck.cards()[1].id.empty());
+  EXPECT_TRUE(deck.ensure_id(deck.cards()[1]) != first_id);
+
   EXPECT_TRUE(deck.save());
   Deck reloaded(path);
   EXPECT_TRUE(reloaded.load());
@@ -2024,6 +2042,69 @@ void test_card_ids() {
   std::remove(path.c_str());
   std::remove(log.c_str());
   std::remove(exported.c_str());
+}
+
+// Opening a deck and closing it must leave the file exactly as it was. The
+// decks in examples/ are the reason: they are checked in, they are written in
+// the short three-column form, and studying one used to rewrite every row of
+// it into the full nine -- so a fresh clone could not be tried out without the
+// repository showing modified files.
+void test_save_leaves_an_unchanged_deck_alone() {
+  const std::string path = temp_path("unchanged.txt");
+  std::remove(path.c_str());
+
+  // The short form, exactly as a deck in examples/ is written.
+  const std::string original =
+      "la biblioteca,library,spanish;nouns\n"
+      "el árbol,tree,spanish;nouns\n";
+  {
+    std::ofstream file(path);
+    file << original;
+  }
+
+  Deck deck(path);
+  EXPECT_TRUE(deck.load());
+  EXPECT_EQ(deck.size(), size_t{2});
+  // Saving reports success without having touched the file.
+  EXPECT_TRUE(deck.save());
+  EXPECT_EQ(file_contents(path), original);
+
+  // Repeatedly, since every answer and every menu exit saves.
+  EXPECT_TRUE(deck.save());
+  EXPECT_TRUE(deck.save());
+  EXPECT_EQ(file_contents(path), original);
+
+  // A real change is still written -- and only as far as the column that
+  // carries it, so the card that did not change keeps its short row and the
+  // one that did grows by exactly the three columns it now needs.
+  deck.cards()[0].leitner_box = 3;
+  EXPECT_TRUE(deck.save());
+  EXPECT_EQ(file_contents(path),
+            std::string("la biblioteca,library,spanish;nouns,0,0,3\n"
+                        "el árbol,tree,spanish;nouns\n"));
+
+  // ...and having written it, the deck knows it is current again.
+  const std::string written = file_contents(path);
+  EXPECT_TRUE(deck.save());
+  EXPECT_EQ(file_contents(path), written);
+
+  // A deck file that does not exist yet is created rather than skipped, even
+  // when the deck is empty and so serialises to nothing at all. The flag and
+  // an empty string are not the same question.
+  const std::string fresh = temp_path("unchanged-new.txt");
+  std::remove(fresh.c_str());
+  Deck new_deck(fresh);
+  EXPECT_TRUE(!new_deck.load());  // no such file, which is not an error
+  EXPECT_TRUE(new_deck.save());
+  {
+    std::ifstream check(fresh);
+    EXPECT_TRUE(check.is_open());
+  }
+
+  std::remove(path.c_str());
+  std::remove(fresh.c_str());
+  std::remove((path + ".log").c_str());
+  std::remove((fresh + ".log").c_str());
 }
 
 void test_wrap() {
@@ -2291,6 +2372,7 @@ int main() {
   test_shipped_example_decks();
   test_summarize();
   test_card_ids();
+  test_save_leaves_an_unchanged_deck_alone();
   test_wrap();
   test_partial_answers();
   test_partial_events();

@@ -206,20 +206,28 @@ question,answer,tags,correct,incorrect,box,last_reviewed,due_date,id,audio,image
 Dates are plain `YYYY-MM-DD`, blank when a card has never been reviewed. Answers may list alternatives separated by `|`. Questions and answers containing commas or quotes are quoted normally, so decks stay greppable and editable by hand.
 
 `id` is 16 hex characters identifying the card for the review log. It is filled
-in automatically the first time a deck is loaded, so hand-written decks can
+in automatically the first time the card is answered, so hand-written decks can
 leave it off, and it stays the same when you edit the card — a fixed typo does
-not orphan the card's history.
+not orphan the card's history. Not on load, deliberately: opening a deck does
+not change it, so a deck you only read is a deck your sync client and your
+version control never see move.
 
 `audio` is a recording of the *question*, as a path relative to the deck file —
 so a deck and the audio directory beside it can be moved or synced as one thing.
 
 `image` is a picture for the card, resolved the same way. See [Images](#images).
 
-Both are written only as far as the last column a card actually uses, which
-means a deck with neither comes out byte for byte as earlier versions wrote it,
-and syncing between a machine that has updated and one that has not does not put
-the whole file in conflict. A card with a picture and no recording still writes
-the empty audio column, because position is what names a field in a CSV.
+**Every card is written only as far as the last column it actually uses**, so a
+deck of plain `question,answer,tags` rows — which is what the examples are, and
+what you get writing one by hand — is saved back in that form rather than
+expanded. A card that has never been reviewed says nothing in the six columns
+after its tags, and so writes none of them.
+
+That is also what keeps a deck byte for byte as earlier versions wrote it, so
+syncing between a machine that has updated and one that has not does not put
+the whole file in conflict. Trailing columns only: a card with a picture and no
+recording still writes the empty audio column, because position is what names a
+field in a CSV.
 
 ### Review Log Format
 

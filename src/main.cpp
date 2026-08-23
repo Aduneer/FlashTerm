@@ -120,6 +120,16 @@ int main(int argc, char* argv[]) {
   std::setlocale(LC_ALL, "");
   color::detect();
 
+  // Before anything opens the deck, and for every action, since all three of
+  // them save it. A path that cannot hold a deck is a mistyped path, and the
+  // moment to say so is now rather than after a card has been typed into a
+  // deck that was never going to be written.
+  if (const std::string problem = deck_path_error(options.deck_path);
+      !problem.empty()) {
+    std::cerr << "FlashTerm: " << problem << "\n";
+    return 2;
+  }
+
   if (options.action == CliAction::AbsorbConflicts) {
     Deck deck(options.deck_path);
     // Same rule as --generate-audio below: these operate on a deck that is
@@ -154,7 +164,23 @@ int main(int argc, char* argv[]) {
               << deck.path() << color::reset << "\n\n";
   } else {
     std::cout << color::green << "Loaded " << deck.size()
-              << " flashcards from " << deck.path() << color::reset << "\n\n";
+              << " flashcards from " << deck.path() << color::reset << "\n";
+    // Said once, on the way in. A deck with a heading or two in it is a
+    // perfectly good deck and this is just a note; a file where almost nothing
+    // is a card is the wrong file, and this is the only moment anyone would
+    // notice before studying it.
+    const int foreign = deck.foreign_lines();
+    if (foreign > 0) {
+      std::cout << color::yellow << count_label(foreign, "line", "lines")
+                << (foreign == 1
+                        ? " is not a flashcard. It is kept exactly as it is"
+                        : " are not flashcards. They are kept exactly as they "
+                          "are")
+                << " and written\nback untouched — if you meant a different "
+                   "file, this is what that looks like.\n"
+                << color::reset;
+    }
+    std::cout << "\n";
   }
 
   try {

@@ -699,6 +699,138 @@ void test_load_missing_file() {
   EXPECT_TRUE(deck.empty());
 }
 
+void test_foreign_lines_survive_saving() {
+  const std::string path = temp_path("foreign.txt");
+  // Cards in the form the app itself writes, so that the only reason a save
+  // could rewrite this file is the foreign lines -- which is what is on trial.
+  const std::string original =
+      "Chapter one\n"
+      "hola,hello,\n"
+      "\n"
+      "TODO: add the rest\n"
+      "adios,goodbye,\n"
+      "notes at the bottom\n";
+  {
+    std::ofstream file(path);
+    file << original;
+  }
+
+  Deck deck(path);
+  EXPECT_TRUE(deck.load());
+  // Only the two real records are cards; the rest is carried, not parsed.
+  EXPECT_EQ(deck.size(), size_t{2});
+  EXPECT_EQ(deck.cards()[0].question, std::string("hola"));
+  EXPECT_EQ(deck.cards()[1].question, std::string("adios"));
+  // The blank line is carried too, but nobody needs warning about a blank line.
+  EXPECT_EQ(deck.foreign_lines(), 3);
+
+  // Nothing has changed, so nothing is written: the file is untouched even
+  // though three of its six lines are not cards.
+  EXPECT_TRUE(deck.save());
+  EXPECT_EQ(file_contents(path), original);
+
+  // Now a real change. Every foreign line has to come back, in its place.
+  deck.cards()[0].leitner_box = 2;
+  EXPECT_TRUE(deck.save());
+  EXPECT_EQ(file_contents(path),
+            "Chapter one\n"
+            "hola,hello,,0,0,2\n"
+            "\n"
+            "TODO: add the rest\n"
+            "adios,goodbye,\n"
+            "notes at the bottom\n");
+
+  std::remove(path.c_str());
+}
+
+void test_non_deck_file_is_not_emptied() {
+  // The mistyped-path case: a file that was never a deck must not be replaced
+  // by the one card somebody then adds to it.
+  const std::string path = temp_path("not-a-deck.txt");
+  {
+    std::ofstream file(path);
+    file << "my important notes\nline two\n";
+  }
+
+  Deck deck(path);
+  EXPECT_TRUE(deck.load());
+  EXPECT_TRUE(deck.empty());
+  EXPECT_EQ(deck.foreign_lines(), 2);
+
+  deck.add(Flashcard("foo", "bar", {}, 0, 0, 1));
+  EXPECT_TRUE(deck.save());
+  const std::string after = file_contents(path);
+  EXPECT_TRUE(after.find("my important notes\nline two\n") == 0);
+  EXPECT_TRUE(after.find("foo,bar,") != std::string::npos);
+
+  std::remove(path.c_str());
+}
+
+void test_foreign_lines_outlive_their_cards() {
+  // Anchors point at cards, so deleting every card has to leave the lines that
+  // were anchored after them somewhere rather than nowhere.
+  const std::string path = temp_path("foreign-orphans.txt");
+  {
+    std::ofstream file(path);
+    file << "heading\nhola,hello\ntrailing note\n";
+  }
+
+  Deck deck(path);
+  EXPECT_TRUE(deck.load());
+  EXPECT_TRUE(deck.remove(0));
+  EXPECT_TRUE(deck.empty());
+  EXPECT_TRUE(deck.save());
+  EXPECT_EQ(file_contents(path), "heading\ntrailing note\n");
+
+  std::remove(path.c_str());
+}
+
+void test_crlf_deck_loads_clean() {
+  // A deck written on Windows, or exported by a spreadsheet. The carriage
+  // return must not become part of the answer: it is invisible on screen and
+  // would be written back as a quoted "hello\r" forever after.
+  const std::string path = temp_path("crlf.txt");
+  {
+    std::ofstream file(path);
+    file << "hola,hello\r\nadios,goodbye\r\n";
+  }
+
+  Deck deck(path);
+  EXPECT_TRUE(deck.load());
+  EXPECT_EQ(deck.size(), size_t{2});
+  EXPECT_EQ(deck.cards()[0].answer, std::string("hello"));
+  EXPECT_EQ(deck.cards()[1].answer, std::string("goodbye"));
+  EXPECT_EQ(deck.foreign_lines(), 0);
+
+  // Saving normalises the line endings rather than quoting the stray return.
+  deck.cards()[0].leitner_box = 2;
+  EXPECT_TRUE(deck.save());
+  EXPECT_EQ(file_contents(path), "hola,hello,,0,0,2\nadios,goodbye,\n");
+
+  std::remove(path.c_str());
+}
+
+void test_deck_path_error() {
+  // A directory is the mistyped path that used to get all the way to the menu.
+  EXPECT_TRUE(!deck_path_error("build").empty());
+  // As is a deck under a directory that does not exist.
+  EXPECT_TRUE(!deck_path_error(temp_path("no-such-dir/deck.txt")).empty());
+
+  // A deck that exists, and one that does not but could, are both fine: a new
+  // deck being created on first run is the normal path.
+  const std::string path = temp_path("path-check.txt");
+  {
+    std::ofstream file(path);
+    file << "hola,hello\n";
+  }
+  EXPECT_EQ(deck_path_error(path), std::string());
+  EXPECT_EQ(deck_path_error(temp_path("brand-new.txt")), std::string());
+  // A bare name has no directory part at all, which must not read as "/".
+  EXPECT_EQ(deck_path_error("flashcards.txt"), std::string());
+
+  std::remove(path.c_str());
+}
+
 void test_save_failure_preserves_deck() {
   // An unwritable path must fail loudly and leave the original file intact.
   const std::string path = temp_path("readonly-dir/deck.txt");
@@ -2339,6 +2471,11 @@ int main() {
   test_save_load_roundtrip();
   test_legacy_deck_migrates();
   test_load_missing_file();
+  test_foreign_lines_survive_saving();
+  test_non_deck_file_is_not_emptied();
+  test_foreign_lines_outlive_their_cards();
+  test_crlf_deck_loads_clean();
+  test_deck_path_error();
   test_save_failure_preserves_deck();
   test_save_is_atomic();
   test_export_is_lossless();

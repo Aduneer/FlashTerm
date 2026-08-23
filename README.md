@@ -229,6 +229,28 @@ the whole file in conflict. Trailing columns only: a card with a picture and no
 recording still writes the empty audio column, because position is what names a
 field in a CSV.
 
+**A line that is not a card is kept, not dropped.** Blank lines, headings and
+notes to yourself survive being loaded and saved, in the position they were
+written:
+
+```
+Chapter one: greetings
+Bonjour,Hello,french
+
+TODO: add the numbers
+Au revoir,Goodbye,french
+```
+
+A deck is a text file you are meant to edit by hand, and a tool that quietly
+deletes the lines it does not understand is not one you can leave a file with.
+The same rule is what protects you from a mistyped path: point FlashTerm at
+something that was never a deck and it says so on the way in, and whatever else
+it holds is still there afterwards.
+
+Line endings are normalised to `\n` when the deck is next written, so a deck
+authored on Windows or exported from a spreadsheet does not end up with a
+stray carriage return glued to the end of every answer.
+
 ### Review Log Format
 
 Alongside `mydeck.txt`, FlashTerm keeps `mydeck.txt.log`: one CSV record per

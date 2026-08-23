@@ -1,0 +1,6 @@
+Chapter one: greetings
+Bonjour,Hello,french
+
+TODO: add the numbers
+Au revoir,Goodbye,french
+notes at the bottom

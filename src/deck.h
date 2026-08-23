@@ -16,7 +16,21 @@ std::string card_to_csv(const Flashcard& card);
 // Returns false for records too short to be a card. Missing trailing fields
 // fall back to their defaults, so a bare "question,answer" line still loads
 // and a pre-scheduling six-field deck simply comes back due immediately.
+//
+// A trailing carriage return is dropped before anything else, so a deck
+// written on Windows or exported by a spreadsheet does not end up with a "\r"
+// glued to the end of every answer -- where it would be invisible on screen,
+// survive into the file as a quoted "answer\r", and be there forever.
 bool card_from_csv(const std::string& line, Flashcard* out);
+
+// Why `path` cannot be used as a deck file, or an empty string when it can.
+//
+// Checked before the deck is opened rather than at the first save. Both of the
+// failures it catches -- the path naming a directory, and the directory that
+// would hold a new deck not existing -- are mistyped paths, and the app used
+// to accept them, show an empty deck, and only report the problem after the
+// user had typed a card into it.
+std::string deck_path_error(const std::string& path);
 
 struct DeckStats {
   int total_cards = 0;
@@ -56,6 +70,13 @@ class Deck {
   bool save(std::string* error = nullptr) const;
 
   const std::string& path() const { return path_; }
+
+  // How many lines of the file were not cards and are being carried through
+  // untouched -- blank lines excluded, since a blank line is not something
+  // anyone needs telling about. Non-zero is worth reporting: it is either a
+  // deck with comments in it, which is fine, or the wrong file entirely, which
+  // is not.
+  int foreign_lines() const;
 
   // Resolves a path stored in the deck against the deck's own directory rather
   // than the working directory, so that a deck and the files beside it survive
@@ -128,8 +149,29 @@ class Deck {
   const std::string& ensure_id(Flashcard& card);
 
  private:
+  // A line of the deck file that is not a card: a comment, a heading, a blank
+  // separator, or something that simply did not parse.
+  //
+  // Kept, because a deck is a plain text file that people edit by hand and a
+  // tool which silently deletes the lines it does not understand is not one
+  // you can trust with a file. Dropping them on load was invisible until the
+  // next save wrote the deck back without them -- and pointing FlashTerm at a
+  // file that was never a deck at all replaced its entire contents with one
+  // card.
+  //
+  // `before_card` is how many cards preceded the line in the file, which is
+  // what anchors it on the way out: a heading stays above the cards it heads,
+  // and trailing notes stay at the bottom. Cards added or deleted in between
+  // move the anchor's meaning, which is the price of not tracking edits the
+  // deck does not otherwise care about; nothing is ever lost either way.
+  struct ForeignLine {
+    std::size_t before_card = 0;
+    std::string text;  // exactly as read, minus the line ending
+  };
+
   std::string path_;
   std::vector<Flashcard> cards_;
+  std::vector<ForeignLine> foreign_;
   EventLog log_;
 
   // What the file holds as of the last successful read or write, so that

@@ -3,6 +3,43 @@
 Notable changes per release. Dates are the release date; the PR numbers link the
 detail, which is where the reasoning lives.
 
+## Unreleased
+
+Three ways a deck file could be damaged or a path mistyped, all of them found
+by pointing the app at files nobody had thought to point it at.
+
+### Fixed
+
+- **Lines that are not cards are no longer deleted.** Anything in a deck file
+  that did not parse as a card was dropped on load, and the next save — after
+  a single answered card — wrote the deck back without it. A heading, a note to
+  yourself, a line with a typo in it: gone, silently, with nothing on screen to
+  say so.
+
+  The worst version was a mistyped path. `FlashTerm ~/notes.txt` opened
+  happily, reported "Loaded 0 flashcards", and replaced the file's entire
+  contents with the first card you added to it.
+
+  Non-card lines are now carried through load and save untouched, anchored to
+  the card they sat above so headings stay above their section and notes stay
+  at the bottom. Opening a deck that has some now says so once, on the way in,
+  which is also what tells you the file was never a deck.
+
+  Blank lines are carried the same way, so a deck with sections in it round
+  trips byte for byte and a save that changes nothing still writes nothing.
+
+- **A deck path that cannot hold a deck is refused, before the menu.** Naming a
+  directory loaded an empty deck and opened as normal; so did naming a file
+  under a directory that does not exist. Either way the problem only surfaced
+  as a failed save, after a card had been typed in. Both are checked up front
+  now, for every mode, and exit 2 with the reason.
+
+- **CRLF decks load clean.** A deck written on Windows, or exported by a
+  spreadsheet, kept the carriage return as part of each answer. It was
+  invisible on screen, but it went back to disk as a quoted `"hello\r"` and
+  stayed there. The line ending is now stripped where the line is parsed, which
+  covers imports as well as decks, and writing normalises to `\n`.
+
 ## 0.3.1 — 2026-08-20
 
 Two fixes and a second platform. Nothing here changes what FlashTerm does or

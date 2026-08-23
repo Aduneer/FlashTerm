@@ -3,10 +3,11 @@
 Notable changes per release. Dates are the release date; the PR numbers link the
 detail, which is where the reasoning lives.
 
-## Unreleased
+## 0.3.2 — 2026-08-23
 
 Three ways a deck file could be damaged or a path mistyped, all of them found
-by pointing the app at files nobody had thought to point it at.
+by pointing the app at files nobody had thought to point it at. The first is
+the one to upgrade for: it could delete lines out of a file you wrote.
 
 ### Fixed
 
@@ -27,18 +28,19 @@ by pointing the app at files nobody had thought to point it at.
 
   Blank lines are carried the same way, so a deck with sections in it round
   trips byte for byte and a save that changes nothing still writes nothing.
+  (#27)
 
 - **A deck path that cannot hold a deck is refused, before the menu.** Naming a
   directory loaded an empty deck and opened as normal; so did naming a file
   under a directory that does not exist. Either way the problem only surfaced
   as a failed save, after a card had been typed in. Both are checked up front
-  now, for every mode, and exit 2 with the reason.
+  now, for every mode, and exit 2 with the reason. (#27)
 
 - **CRLF decks load clean.** A deck written on Windows, or exported by a
   spreadsheet, kept the carriage return as part of each answer. It was
   invisible on screen, but it went back to disk as a quoted `"hello\r"` and
   stayed there. The line ending is now stripped where the line is parsed, which
-  covers imports as well as decks, and writing normalises to `\n`.
+  covers imports as well as decks, and writing normalises to `\n`. (#27)
 
 ## 0.3.1 — 2026-08-20
 

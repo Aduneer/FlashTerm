@@ -1,0 +1,88 @@
+--- output ---
+Loaded 2 flashcards from deck.txt
+3 lines are not flashcards. They are kept exactly as they are and written
+back untouched — if you meant a different file, this is what that looks like.
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (2 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Review ---
+[1] Due now  (2 cards)
+[2] All cards
+[3] By tag
+[4] Difficult only  (incorrect > correct)
+[5] By Leitner box, weakest first
+[q] Back to the main menu
+> 
+--- Prompt Direction ---
+[Enter] Normal — question shown, you type the answer
+[r] Reversed — answer shown, you type the question
+> Progress: [██████████░░░░░░░░░░] 50% (1/2 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french                                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Bonjour                                                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [a] play audio   [?] hint   [q] end session
+Your answer: 
+✅ Correct!
+Card promoted to Box 2!
+Next review in 3 days (<DATE1>).
+
+[Enter] next card   [a] hear the question   [e] edit this card
+[u] undo this answer   [q] end session
+> Progress: [████████████████████] 100% (2/2 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · french                                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Au revoir                                                  │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [a] play audio   [?] hint   [q] end session
+Your answer: 
+❌ Incorrect! Correct answer: Goodbye
+Next review in 1 day (<DATE2>).
+
+[Enter] next card   [a] hear the question   [e] edit this card
+[u] undo this answer   [q] end session
+> ==================================================
+                 REVIEW COMPLETE                  
+==================================================
+  Correct:        1
+  Incorrect:      1
+  Total Reviewed: 2
+  Success Rate:   50.00%
+  Still Due:      0
+==================================================
+
+[any key] back to the main menu
+> 
+Input stream closed/EOF. Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Chapter one: greetings
+Bonjour,Hello,french,1,0,2,<DATE3>,<DATE1>,<ID1>
+
+TODO: add the numbers
+Au revoir,Goodbye,french,0,1,1,<DATE3>,<DATE2>,<ID2>
+notes at the bottom
+--- file deck.txt.log ---
+<ID3>,<ID1>,<TIME>,n,correct,1,2,
+<ID4>,<ID2>,<TIME>,n,incorrect,1,1,

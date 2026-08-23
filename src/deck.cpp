@@ -1,5 +1,7 @@
 #include "deck.h"
 
+#include <sys/stat.h>
+
 #include <algorithm>
 #include <cerrno>
 #include <cstdio>
@@ -28,7 +30,48 @@ int parse_int_or(const std::vector<std::string>& fields, size_t index,
 std::string errno_message() {
   return std::strerror(errno);
 }
+
+// The line without the carriage return a CRLF file leaves on the end of it.
+// One only: a "\r" anywhere else is content, and a field really holding one
+// went through the CSV quoting like anything else would.
+std::string without_cr(const std::string& line) {
+  if (!line.empty() && line.back() == '\r') return line.substr(0, line.size() - 1);
+  return line;
+}
+
+// The directory a file would be created in. "." for a bare name, and "/" for
+// a path directly beneath the root, both of which the naive substr gets wrong.
+std::string parent_directory(const std::string& path) {
+  const std::size_t slash = path.find_last_of('/');
+  if (slash == std::string::npos) return ".";
+  if (slash == 0) return "/";
+  return path.substr(0, slash);
+}
 }  // namespace
+
+std::string deck_path_error(const std::string& path) {
+  struct stat info;
+  if (stat(path.c_str(), &info) == 0) {
+    if (S_ISDIR(info.st_mode)) {
+      return path + " is a directory, not a deck file";
+    }
+    // Anything else that exists is worth trying to read. Whether it can be
+    // read or written is a question for the read and the write, which report
+    // it far better than a guess here would.
+    return "";
+  }
+
+  // Not there yet, which is how every deck starts -- but only if there is
+  // somewhere to put it.
+  const std::string directory = parent_directory(path);
+  if (stat(directory.c_str(), &info) != 0) {
+    return "cannot create " + path + ": there is no directory " + directory;
+  }
+  if (!S_ISDIR(info.st_mode)) {
+    return "cannot create " + path + ": " + directory + " is not a directory";
+  }
+  return "";
+}
 
 std::string card_to_csv(const Flashcard& card) {
   const std::string columns[] = {
@@ -86,7 +129,7 @@ std::string card_to_csv(const Flashcard& card) {
 }
 
 bool card_from_csv(const std::string& line, Flashcard* out) {
-  std::vector<std::string> fields = parse_csv_line(line);
+  std::vector<std::string> fields = parse_csv_line(without_cr(line));
   if (fields.size() < 2) return false;  // needs at least a question and answer
 
   const std::string tags_str = (fields.size() >= 3) ? fields[2] : "";
@@ -126,6 +169,7 @@ std::string Deck::resolve(const std::string& relative) const {
 
 bool Deck::load() {
   cards_.clear();
+  foreign_.clear();
   // A deck with no log yet is the normal starting state, so its absence is not
   // reported: an empty log and existing counters is a valid deck.
   log_.load();
@@ -150,11 +194,16 @@ bool Deck::load() {
   std::istringstream lines(on_disk_);
   std::string line;
   while (std::getline(lines, line)) {
-    if (trim(line).empty()) continue;
+    line = without_cr(line);
     Flashcard card("", "");
-    if (card_from_csv(line, &card)) {
+    if (!trim(line).empty() && card_from_csv(line, &card)) {
       cards_.push_back(card);
+      continue;
     }
+    // Not a card, so it is somebody's comment, heading or blank separator --
+    // or a sign that this file was never a deck. Either way it is kept and
+    // written back rather than dropped; see ForeignLine.
+    foreign_.push_back({cards_.size(), line});
   }
 
   // Note that ids are deliberately *not* minted here; see Deck::ensure_id.
@@ -166,9 +215,33 @@ bool Deck::load() {
 
 bool Deck::save(std::string* error) const {
   std::string content;
-  for (const auto& card : cards_) {
-    content += card_to_csv(card);
+  std::size_t next_foreign = 0;
+
+  // Everything that was not a card goes back where it was, ahead of the card
+  // it sat above. Written first for each position, so a file that has not been
+  // touched comes back out byte for byte -- which is what keeps the no-op
+  // check below working on a deck with comments in it.
+  const auto emit_foreign_before = [&](std::size_t card_index) {
+    while (next_foreign < foreign_.size() &&
+           foreign_[next_foreign].before_card <= card_index) {
+      content += foreign_[next_foreign].text;
+      content += "\n";
+      ++next_foreign;
+    }
+  };
+
+  for (std::size_t i = 0; i < cards_.size(); ++i) {
+    emit_foreign_before(i);
+    content += card_to_csv(cards_[i]);
     content += "\n";
+  }
+  // Everything still left, unconditionally: notes at the bottom of the file
+  // anchor past the last card, and so does every one of them once enough cards
+  // have been deleted that no anchor can still be reached.
+  while (next_foreign < foreign_.size()) {
+    content += foreign_[next_foreign].text;
+    content += "\n";
+    ++next_foreign;
   }
 
   // A write that would reproduce the file exactly is not a save. Every call
@@ -211,6 +284,14 @@ bool Deck::save(std::string* error) const {
   on_disk_ = content;
   on_disk_known_ = true;
   return true;
+}
+
+int Deck::foreign_lines() const {
+  int count = 0;
+  for (const auto& line : foreign_) {
+    if (!trim(line.text).empty()) ++count;
+  }
+  return count;
 }
 
 void Deck::add(const Flashcard& card) {

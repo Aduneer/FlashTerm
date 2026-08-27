@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include "answer.h"
+#include "cloze.h"
 #include "date.h"
 #include "event.h"
 #include "schedule.h"
@@ -24,8 +26,30 @@ void draw_bar(int filled, int width) {
 
 // `number` is the card's position in the deck, not its position in whatever
 // list is being shown, so the number stays the same after a search narrows it.
+// The blanks of a cloze card, in the order it asks them. What the list shows
+// in the answer column, since a cloze card's own answer column is empty.
+std::string cloze_answers(const std::string& question) {
+  std::string answers;
+  for (const auto& blank : cloze::deletions(question)) {
+    if (!answers.empty()) answers += ", ";
+    answers += primary_answer(blank.answer);
+  }
+  return answers;
+}
+
 void print_card_row(const Flashcard& card, std::size_t number, int today_days) {
-  std::cout << number << ". " << card.question << " - " << card.answer;
+  // A cloze card is listed as it will be asked -- holes open, answers beside
+  // it -- rather than as it is written. A column of raw braces is the one way
+  // of showing a cloze deck that cannot be read at a glance, and reading the
+  // deck at a glance is what the list is for. The braces are still there in
+  // the editor, which is where they are needed.
+  if (cloze::contains(card.question)) {
+    std::cout << number << ". "
+              << cloze::render(card.question, cloze::kAllGroups) << " - "
+              << cloze_answers(card.question);
+  } else {
+    std::cout << number << ". " << card.question << " - " << card.answer;
+  }
   if (!card.tags.empty()) {
     std::cout << " [Tags: " << card.tags_to_string() << "]";
   }
@@ -146,7 +170,9 @@ void autosave(const Deck& deck) {
 
 void add_flashcard(Deck& deck) {
   std::cout << color::cyan << "\n--- Add a Flashcard ---\n"
-            << color::reset << "Question, or Enter to cancel.\n";
+            << color::reset
+            << "Question, or Enter to cancel.\n"
+               "Wrap a word in {{braces}} to make it a blank to fill in.\n";
   print_prompt();
   std::string question;
   read_line(question);
@@ -158,8 +184,15 @@ void add_flashcard(Deck& deck) {
     return;
   }
 
-  const std::string answer = prompt(
-      "Enter answer (separate alternatives with |, e.g. std::vector|vector): ");
+  // A cloze question already holds its answers, so asking for one more would
+  // be asking for something the review loop is never going to use.
+  std::string answer;
+  if (cloze::contains(question)) {
+    std::cout << "Cloze card — its answers are the {{blanks}} above.\n";
+  } else {
+    answer = prompt(
+        "Enter answer (separate alternatives with |, e.g. std::vector|vector): ");
+  }
   const std::string tags_str =
       prompt("Enter tags (semicolon-separated, e.g. math;science): ");
 
@@ -185,9 +218,17 @@ void list_flashcards(const Deck& deck) {
 void edit_card_fields(Flashcard& card) {
   const std::string question =
       prompt("Enter new question (current: " + card.question + "): ");
-  const std::string answer =
-      prompt("Enter new answer (current: " + card.answer +
-             ") [use | to accept alternatives]: ");
+  // Asked against what the question is about to become, not what it was, so
+  // that turning a card into a cloze one stops asking for an answer in the
+  // same breath -- and turning it back asks for one again.
+  const std::string becomes = question.empty() ? card.question : question;
+  std::string answer;
+  if (cloze::contains(becomes)) {
+    std::cout << "This card's answers are the {{blanks}} in its question.\n";
+  } else {
+    answer = prompt("Enter new answer (current: " + card.answer +
+                    ") [use | to accept alternatives]: ");
+  }
   const std::string tags_str =
       prompt("Enter new tags (semicolon;separated, current: " +
              card.tags_to_string() + "): ");
@@ -475,6 +516,11 @@ void print_help() {
          "7 - Manage Tags (list all unique tags)\n"
          "0 - Save and exit\n"
          "h/? - Show this help screen\n"
+      << color::cyan << "\nCard types\n"
+      << color::reset
+      << "  Wrap a word in {{braces}} and the card becomes a sentence with a\n"
+         "  hole in it, answered by filling the hole in. Such a card needs no\n"
+         "  answer column: its answers are the words in the braces.\n"
       << color::cyan << "\nAt the answer prompt\n"
       << color::reset << "  "
       << legend({{"?", "hint — reveals the first letter; counts as a partial"}})

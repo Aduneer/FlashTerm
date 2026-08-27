@@ -15,6 +15,7 @@ Creating a new flashcard deck: deck.txt
 > 
 --- Add a Flashcard ---
 Question, or Enter to cancel.
+Wrap a word in {{braces}} to make it a blank to fill in.
 > Enter answer (separate alternatives with |, e.g. std::vector|vector): Enter tags (semicolon-separated, e.g. math;science): Flashcard added!
 
 

@@ -15,6 +15,7 @@ Loaded 1 flashcards from deck.txt
 > 
 --- Add a Flashcard ---
 Question, or Enter to cancel.
+Wrap a word in {{braces}} to make it a blank to fill in.
 > Enter answer (separate alternatives with |, e.g. std::vector|vector): 
 Input stream closed/EOF. Flashcards saved. Goodbye!
 --- exit status ---

@@ -1,0 +1,120 @@
+--- output ---
+Loaded 1 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (1 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> 
+--- Review ---
+[1] Due now  (1 card)
+[2] All cards
+[3] By tag
+[4] Difficult only  (incorrect > correct)
+[5] By Leitner box, weakest first
+[q] Back to the main menu
+> 
+--- Prompt Direction ---
+[Enter] Normal — question shown, you type the answer
+[r] Reversed — answer shown, you type the question
+> Progress: [████████████████████] 100% (1/1 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · geography · blank 1 of 3                       │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   [...] is the capital of France, and [...] sits on the      │
+│   Seine                                                      │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+[Enter] submit   [a] play audio   [?] hint   [q] end session
+Your answer: Progress: [████████████████████] 100% (1/1 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · geography · blank 2 of 3                       │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Paris is the capital of [...], and Paris sits on the Seine │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+  ✅  blank 1  Paris
+[Enter] submit   [a] play audio   [?] hint   [q] end session
+Your answer: Progress: [████████████████████] 100% (1/1 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · geography · blank 3 of 3                       │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Paris is the capital of France, and Paris sits on the      │
+│   [river]                                                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+  ✅  blank 1  Paris
+  ❌  blank 2  France  (you typed: normandy)
+[Enter] submit   [a] play audio   [?] hint   [q] end session
+Your answer: Progress: [████████████████████] 100% (1/1 cards)
+
+┌──────────────────────────────────────────────────────────────┐
+│ Box 1 · new · geography · blank 3 of 3                       │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Paris is the capital of France, and Paris sits on the      │
+│   [river]                                                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+  ✅  blank 1  Paris
+  ❌  blank 2  France  (you typed: normandy)
+Hint: S····
+[Enter] submit   [a] play audio   [q] end session
+Your answer: 
+  ✅  blank 1  Paris
+  ❌  blank 2  France  (you typed: normandy)
+  ⚠️   blank 3  Seine  (hint)
+
+Paris is the capital of France, and Paris sits on the Seine
+
+❌ Counted as incorrect — a sentence is only right when every blank is.
+Next review in 1 day (<DATE1>).
+
+[Enter] next card   [a] hear the question   [e] edit this card
+[u] undo this answer   [q] end session
+> ==================================================
+                 REVIEW COMPLETE                  
+==================================================
+  Correct:        0
+  Incorrect:      1
+  Total Reviewed: 1
+  Success Rate:   0.00%
+  Still Due:      0
+==================================================
+
+[any key] back to the main menu
+> 
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+"{{c1::Paris}} is the capital of {{c2::France}}, and {{c1::Paris}} sits on the {{c3::Seine::river}}",,geography,0,1,1,<DATE2>,<DATE1>,<ID1>
+--- file deck.txt.log ---
+<ID2>,<ID1>,<TIME>,n,incorrect,1,1,

@@ -1,0 +1,2 @@
+Bonjour,Hello,french
+Water boils at {{100}} °C,,science

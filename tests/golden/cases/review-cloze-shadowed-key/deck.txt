@@ -1,0 +1,1 @@
+"In vim, {{c1::q}} starts a macro and {{c2::ZZ}} saves and quits",,vim

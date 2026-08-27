@@ -15,6 +15,7 @@
 
 #include "answer.h"
 #include "cli.h"
+#include "cloze.h"
 #include "date.h"
 #include "deck.h"
 #include "event.h"
@@ -1053,6 +1054,197 @@ void test_reverse_prompting() {
   EXPECT_TRUE(check_answer("la bibliotecca", expected_answer(vocab, true)).near_miss);
 }
 
+void test_cloze_parsing() {
+  using namespace cloze;
+
+  // The short form: everything between the braces is the answer.
+  EXPECT_TRUE(contains("The {{mitochondrion}} is the powerhouse"));
+  std::vector<Deletion> blanks = deletions("The {{mitochondrion}} is the powerhouse");
+  EXPECT_EQ(blanks.size(), std::size_t(1));
+  EXPECT_EQ(blanks[0].group, 1);
+  EXPECT_EQ(blanks[0].answer, std::string("mitochondrion"));
+  EXPECT_EQ(blanks[0].hint, std::string(""));
+
+  // The numbered form, with and without a hint.
+  blanks = deletions("The {{c1::mitochondrion::organelle}} makes ATP");
+  EXPECT_EQ(blanks.size(), std::size_t(1));
+  EXPECT_EQ(blanks[0].group, 1);
+  EXPECT_EQ(blanks[0].answer, std::string("mitochondrion"));
+  EXPECT_EQ(blanks[0].hint, std::string("organelle"));
+
+  // A "::" inside the answer is what a C++ deck is made of, so the short form
+  // never looks for a hint and keeps the whole body.
+  blanks = deletions("Use {{std::vector}} for a dynamic array");
+  EXPECT_EQ(blanks.size(), std::size_t(1));
+  EXPECT_EQ(blanks[0].answer, std::string("std::vector"));
+  EXPECT_EQ(blanks[0].hint, std::string(""));
+
+  // The numbered form does look for one, exactly as Anki's does -- so a "::"
+  // answer written that way needs the trailing separator that says "no hint".
+  blanks = deletions("Use {{c1::std::vector}} for a dynamic array");
+  EXPECT_EQ(blanks[0].answer, std::string("std"));
+  EXPECT_EQ(blanks[0].hint, std::string("vector"));
+  blanks = deletions("Use {{c1::std::vector::}} for a dynamic array");
+  EXPECT_EQ(blanks[0].answer, std::string("std::vector"));
+  EXPECT_EQ(blanks[0].hint, std::string(""));
+
+  // Alternatives work inside a deletion exactly as they do in an answer
+  // column, so a blank can accept either of two words.
+  blanks = deletions("The {{c1::powerhouse|mitochondrion}} of the cell");
+  EXPECT_EQ(blanks[0].answer, std::string("powerhouse|mitochondrion"));
+  EXPECT_TRUE(check_answer("mitochondrion", blanks[0].answer).exact);
+  EXPECT_TRUE(check_answer("powerhouse", blanks[0].answer).exact);
+
+  // Nothing that cannot be answered becomes a blank, so a card written with a
+  // brace in it stays an ordinary card rather than an unanswerable one.
+  EXPECT_TRUE(!contains("What does {{}} mean?"));
+  EXPECT_TRUE(!contains("What does {{c1::}} mean?"));
+  EXPECT_TRUE(!contains("An unclosed {{brace"));
+  EXPECT_TRUE(!contains("What does a brace mean?"));
+  EXPECT_TRUE(!contains("Print {} in Python"));
+  EXPECT_EQ(deletions("What does {{}} mean?").size(), std::size_t(0));
+
+  // Whitespace around the parts is the author's formatting, not the answer.
+  blanks = deletions("The {{c1:: mitochondrion :: organelle }} makes ATP");
+  EXPECT_EQ(blanks[0].answer, std::string("mitochondrion"));
+  EXPECT_EQ(blanks[0].hint, std::string("organelle"));
+}
+
+void test_cloze_numbering() {
+  using namespace cloze;
+
+  // Unnumbered deletions are asked left to right.
+  std::vector<Deletion> blanks = deletions("{{Paris}} is in {{France}}");
+  EXPECT_EQ(blanks.size(), std::size_t(2));
+  EXPECT_EQ(blanks[0].answer, std::string("Paris"));
+  EXPECT_EQ(blanks[1].answer, std::string("France"));
+
+  // One number in two places is one blank, not two.
+  blanks = deletions("{{c1::Paris}} is French; {{c1::Paris}} is its capital");
+  EXPECT_EQ(blanks.size(), std::size_t(1));
+  EXPECT_EQ(blanks[0].answer, std::string("Paris"));
+
+  // Numbers say the order, so a deck can ask its holes out of reading order.
+  blanks = deletions("{{c2::Paris}} is the capital of {{c1::France}}");
+  EXPECT_EQ(blanks.size(), std::size_t(2));
+  EXPECT_EQ(blanks[0].answer, std::string("France"));
+  EXPECT_EQ(blanks[1].answer, std::string("Paris"));
+
+  // An unnumbered deletion takes the lowest number nothing else has claimed,
+  // so mixing the two forms cannot produce two blanks that are secretly one.
+  blanks = deletions("{{Seine}} flows through {{c1::Paris}}");
+  EXPECT_EQ(blanks.size(), std::size_t(2));
+  EXPECT_EQ(blanks[0].group, 1);
+  EXPECT_EQ(blanks[0].answer, std::string("Paris"));
+  EXPECT_EQ(blanks[1].group, 2);
+  EXPECT_EQ(blanks[1].answer, std::string("Seine"));
+}
+
+void test_cloze_rendering() {
+  using namespace cloze;
+  const std::string sentence =
+      "{{c1::Paris}} is the capital of {{c2::France}}, on the {{c3::Seine::river}}";
+
+  // One hole open, the rest filled in: what the review loop shows.
+  EXPECT_EQ(render(sentence, 1),
+            std::string("[...] is the capital of France, on the Seine"));
+  EXPECT_EQ(render(sentence, 2),
+            std::string("Paris is the capital of [...], on the Seine"));
+  // A deletion carrying a hint shows it in place of the blank.
+  EXPECT_EQ(render(sentence, 3),
+            std::string("Paris is the capital of France, on the [river]"));
+
+  // Every hole open, and every hole filled in.
+  EXPECT_EQ(render(sentence, kAllGroups),
+            std::string("[...] is the capital of [...], on the [river]"));
+  EXPECT_EQ(reveal(sentence),
+            std::string("Paris is the capital of France, on the Seine"));
+
+  // Both places of one group open together, because they are one blank.
+  EXPECT_EQ(render("{{c1::Paris}} is French; {{c1::Paris}} is its capital", 1),
+            std::string("[...] is French; [...] is its capital"));
+
+  // A filled-in hole shows only the first accepted answer, since
+  // "powerhouse|mitochondrion" is not a sentence.
+  EXPECT_EQ(reveal("The {{c1::powerhouse|mitochondrion}} of the cell"),
+            std::string("The powerhouse of the cell"));
+
+  // Read aloud, a hole is a word rather than punctuation a synthesiser would
+  // either spell out or swallow.
+  EXPECT_EQ(render(sentence, 1, Blank::kSpoken),
+            std::string("blank is the capital of France, on the Seine"));
+
+  // Text with no deletions in it comes back untouched, whatever is asked for.
+  EXPECT_EQ(render("An ordinary question?", kAllGroups),
+            std::string("An ordinary question?"));
+}
+
+void test_cloze_cards_round_trip() {
+  // A cloze line is a whole card on its own: its answers are inside it, so the
+  // answer column has nothing to hold and a hand-written deck of them is a
+  // file of bare sentences.
+  Flashcard card("x", "y");
+  EXPECT_TRUE(card_from_csv("Water boils at {{100}} degrees", &card));
+  EXPECT_EQ(card.question, std::string("Water boils at {{100}} degrees"));
+  EXPECT_EQ(card.answer, std::string(""));
+  EXPECT_EQ(card.tags.size(), std::size_t(0));
+
+  // Which is exactly how it is written back, or opening such a deck would
+  // rewrite every line of it.
+  EXPECT_EQ(card_to_csv(card), std::string("Water boils at {{100}} degrees"));
+
+  // A line that is not a card is still not a card. Without the deletion test
+  // every line of every text file would become one, and the rule that keeps a
+  // mistyped path from being overwritten depends on that not happening.
+  EXPECT_TRUE(!card_from_csv("Chapter one: greetings", &card));
+  EXPECT_TRUE(!card_from_csv("Print {} in Python", &card));
+
+  // Tags and review state are written as they are for any other card, the
+  // empty answer column included, because position is what names a field.
+  Flashcard tagged("The {{c1::mitochondrion}} makes ATP", "", {"biology"});
+  EXPECT_EQ(card_to_csv(tagged),
+            std::string("The {{c1::mitochondrion}} makes ATP,,biology"));
+  tagged.leitner_box = 3;
+  EXPECT_EQ(card_to_csv(tagged),
+            std::string("The {{c1::mitochondrion}} makes ATP,,biology,0,0,3"));
+
+  // A sentence with a comma in it is quoted like any other field, and still
+  // reads back as one column.
+  Flashcard commas("{{c1::Paris}} is French, and it is the capital", "");
+  const std::string row = card_to_csv(commas);
+  EXPECT_EQ(row,
+            std::string("\"{{c1::Paris}} is French, and it is the capital\""));
+  EXPECT_TRUE(card_from_csv(row, &card));
+  EXPECT_EQ(card.question, commas.question);
+  EXPECT_EQ(card.answer, std::string(""));
+
+  // A deck that gives a cloze card an answer column anyway loads and saves it
+  // untouched; review ignores it, but nothing silently deletes it.
+  EXPECT_TRUE(card_from_csv("The {{a}} b,leftover,tag", &card));
+  EXPECT_EQ(card.answer, std::string("leftover"));
+  EXPECT_EQ(card_to_csv(card), std::string("The {{a}} b,leftover,tag"));
+}
+
+void test_cloze_prompting() {
+  // A cloze card is described whole and ignores the session's direction:
+  // reversing it would show the finished sentence and ask for the one with
+  // holes in it, which is not a question. The review loop asks it one hole at
+  // a time instead.
+  Flashcard card("The {{c1::mitochondrion}} is the {{c2::powerhouse}}", "");
+  const std::string open = "The [...] is the [...]";
+  const std::string done = "The mitochondrion is the powerhouse";
+
+  EXPECT_EQ(prompt_text(card, false), open);
+  EXPECT_EQ(prompt_text(card, true), open);
+  EXPECT_EQ(expected_answer(card, false), done);
+  EXPECT_EQ(expected_answer(card, true), done);
+
+  // An ordinary card is unaffected by any of this.
+  Flashcard plain("Bonjour", "Hello");
+  EXPECT_EQ(prompt_text(plain, false), std::string("Bonjour"));
+  EXPECT_EQ(expected_answer(plain, true), std::string("Bonjour"));
+}
+
 CliOptions parse(std::vector<const char*> args) {
   args.insert(args.begin(), "FlashTerm");
   return parse_args(static_cast<int>(args.size()), args.data(), "default.txt");
@@ -2044,9 +2236,21 @@ void test_shipped_example_decks() {
 
     for (const auto& card : deck.cards()) {
       EXPECT_TRUE(!trim(card.question).empty());
-      EXPECT_TRUE(!trim(card.answer).empty());
-      // An answer of only alternative separators accepts nothing at all.
-      EXPECT_TRUE(!normalize_answer(card.answer).empty());
+      // A cloze card keeps its answers inside its question, so that is where
+      // this has to look: an empty answer column is correct there and an empty
+      // deletion would be the card that can never be got right.
+      if (cloze::contains(card.question)) {
+        const std::vector<cloze::Deletion> blanks =
+            cloze::deletions(card.question);
+        EXPECT_TRUE(!blanks.empty());
+        for (const auto& blank : blanks) {
+          EXPECT_TRUE(!normalize_answer(blank.answer).empty());
+        }
+      } else {
+        EXPECT_TRUE(!trim(card.answer).empty());
+        // An answer of only alternative separators accepts nothing at all.
+        EXPECT_TRUE(!normalize_answer(card.answer).empty());
+      }
       // A picture named by a shipped deck has to actually be there, or the
       // example teaches the feature by failing to demonstrate it.
       if (!card.image.empty()) {
@@ -2488,6 +2692,11 @@ int main() {
   test_deck_from_env();
   test_find();
   test_reverse_prompting();
+  test_cloze_parsing();
+  test_cloze_numbering();
+  test_cloze_rendering();
+  test_cloze_cards_round_trip();
+  test_cloze_prompting();
   test_event_ids();
   test_timestamps();
   test_event_csv();

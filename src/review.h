@@ -16,6 +16,12 @@ void review_flashcards(Deck& deck);
 //
 // Only the first accepted answer is used as the prompt, since "git add|add" is
 // not a sensible thing to show.
+//
+// A cloze card ignores `reversed` and is described whole: the prompt is its
+// sentence with every hole open and the expected answer is the same sentence
+// with every hole filled in. Reversing it would mean showing the finished
+// sentence and asking for the one with holes in it, which is not a question.
+// The review loop asks such a card one hole at a time instead; see cloze.h.
 std::string prompt_text(const Flashcard& card, bool reversed);
 std::string expected_answer(const Flashcard& card, bool reversed);
 }  // namespace FlashTerm

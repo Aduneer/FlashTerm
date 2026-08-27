@@ -3,6 +3,63 @@
 Notable changes per release. Dates are the release date; the PR numbers link the
 detail, which is where the reasoning lives.
 
+## Unreleased
+
+### Added
+
+- **Cloze deletion.** Wrap a word in `{{braces}}` and the card becomes a
+  sentence with a hole in it:
+
+  ```
+  The {{mitochondrion}} is the powerhouse of the cell,,biology
+  ```
+
+  is asked as `The [...] is the powerhouse of the cell`, and the finished
+  sentence is shown back once you have answered. It is a way of *writing* a
+  card rather than a new kind of card: one Leitner box, one id, one due date,
+  and tags, hints, undo, editing and the log all work on it unchanged.
+
+  **The answer column is empty**, because the answers live inside the question.
+  That makes a cloze card a whole card on a single field, so a deck of them is
+  a file of bare sentences — and it is written back exactly that way rather
+  than expanded to `sentence,,`, which is the same rule that already keeps a
+  `question,answer,tags` deck from growing trailing commas.
+
+  The syntax is Anki's, so decks paste across in both directions: `{{text}}`,
+  `{{c1::text}}`, and `{{c1::text::hint}}` for a nudge shown in place of the
+  blank. Alternatives work inside a deletion exactly as they do in an answer
+  column, so `{{c1::powerhouse|mitochondrion}}` accepts either. Repeating a
+  number makes two places in the sentence into one blank; an unnumbered blank
+  takes the lowest number nothing else has claimed.
+
+  A hint is only looked for after a `cN::`, which is what lets the short form
+  hold an answer with a `::` in it — `{{std::vector}}` is one answer, not an
+  answer of `std` hinted with `vector`. A C++ deck needs that distinction and
+  the separator alone cannot make it.
+
+  **A sentence with several holes is asked one hole at a time and scheduled
+  once, on the worst of the answers.** Each blank you finish is filled in for
+  the next, and what it earned stays on screen underneath. One review and one
+  log event however many holes the sentence has — otherwise a three-blank
+  sentence would promote a card three boxes in a single sitting.
+
+  Two things cloze cards deliberately do not do. They are **never asked
+  reversed**: their answers are already inside their question, so there is
+  nothing to turn round, and a reversed session asks them forwards and logs
+  them as `n` — which is also what lets a mixed deck be studied backwards
+  without splitting it in two. And **`--generate-audio` skips them**, because a
+  recording is of the question and a cloze question read aloud is the answer
+  read aloud. The `a` key still works during review: the open blank is spoken
+  as the word "blank", and the whole sentence is read once the card is done.
+
+  `examples/cloze-science.csv` is twelve cards' worth to copy from, and the
+  manage list shows a cloze card as it will be asked rather than as a row of
+  braces. (#29)
+
+- **A golden case for the in-app help screen.** `h` from the main menu had no
+  end-to-end coverage at all — the existing `help` case is `--help`, which is a
+  different screen printed by different code. (#29)
+
 ## 0.3.2 — 2026-08-23
 
 Three ways a deck file could be damaged or a path mistyped, all of them found

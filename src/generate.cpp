@@ -7,6 +7,7 @@
 #include <string>
 
 #include "audio.h"
+#include "cloze.h"
 #include "text.h"
 #include "voice.h"
 
@@ -99,6 +100,18 @@ GenerateResult generate_audio(Deck& deck, const std::string& voice, bool force,
   bool reported = false;
 
   for (Flashcard& card : deck.cards()) {
+    // A recording is of the question, and a cloze question read out is the
+    // answer read out. There is no one rendering to make either: a sentence
+    // with three holes is asked three different ways, so this would have to
+    // record three files against a column that holds one. Skipped rather than
+    // failed -- a mixed deck should still get recordings for the cards that
+    // can have them.
+    if (cloze::contains(card.question)) {
+      out << "  skipped   " << card.question << "  (cloze)\n";
+      ++result.skipped;
+      continue;
+    }
+
     const std::string relative =
         card.audio.empty() ? audio_file_for(card) : card.audio;
     const std::string absolute = deck.resolve(relative);

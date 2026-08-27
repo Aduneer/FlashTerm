@@ -12,6 +12,7 @@
 
 #include "answer.h"
 #include "audio.h"
+#include "cloze.h"
 #include "date.h"
 #include "event.h"
 #include "image.h"
@@ -303,11 +304,11 @@ CardRefs collect_matches(Deck& deck, const Filters& filters, int today_days) {
 // Plays whatever the card is currently showing, and says whether anything came
 // out. In a reversed session what is showing is the answer, and the recording
 // is deliberately skipped there: the audio column holds a reading of the
-// question, which is the very thing being asked for.
-bool play_prompt(const Deck& deck, const Flashcard& card, bool reversed) {
-  const std::string file = reversed ? std::string() : deck.audio_path(card);
-  const std::string text =
-      reversed ? primary_answer(card.answer) : card.question;
+// question, which is the very thing being asked for. A cloze card skips it for
+// the same reason -- the recording is of the whole sentence, holes filled in.
+bool play_prompt(const Deck& deck, const Flashcard& card, bool use_recording,
+                 const std::string& text) {
+  const std::string file = use_recording ? deck.audio_path(card) : std::string();
   return audio::play(file, text);
 }
 
@@ -347,16 +348,98 @@ void print_progress(size_t position, size_t total) {
 }
 
 // "Box 2  ·  due today  ·  spanish  ·  reversed"
-std::string card_summary(const Flashcard& card, int today_days, bool reversed) {
+//
+// `blank` and `blanks` say which hole of a cloze card is open; a card with one
+// hole, and every card that is not cloze, says nothing about it. Worth putting
+// here rather than under the frame because it is the one thing that changes
+// between the several prompts a single cloze card produces, and the summary
+// line is where the eye already goes to find out what it is looking at.
+std::string card_summary(const Flashcard& card, int today_days, bool reversed,
+                         std::size_t blank, std::size_t blanks) {
   std::string summary = "Box " + std::to_string(card.leitner_box) + "  ·  " +
                         describe_due(card.due_date, today_days);
   if (!card.tags.empty()) {
     summary += "  ·  " + card.tags_to_string();
   }
+  if (blanks > 1) {
+    summary += "  ·  blank " + std::to_string(blank + 1) + " of " +
+               std::to_string(blanks);
+  }
   if (reversed) {
     summary += "  ·  reversed";
   }
   return summary;
+}
+
+// One thing the user is asked to type. A plain card produces exactly one of
+// these; a cloze card produces one per blank, asked in turn within a single
+// presentation of the card.
+//
+// Everything the prompt loop needs is worked out here rather than rediscovered
+// inside it, which is what keeps that loop from having to know whether it is
+// looking at a cloze card, a reversed one or an ordinary one.
+struct Ask {
+  std::string shown;         // what goes inside the frame
+  std::string expected;      // accepted answers, "|" alternatives and all
+  std::string reveal;        // the single answer shown when it is missed
+  std::string alternatives;  // the others, "" when there are none
+  std::string spoken;        // what the audio key reads out
+  bool use_recording = false;
+  const char* label = "Your answer: ";
+};
+
+// A cloze card is never asked backwards. Its answers live inside its question,
+// so there is nothing to turn round: reversing it would show the sentence with
+// its holes filled in and ask for the sentence with its holes in it. A
+// reversed session simply asks such cards forwards, which is also what stops a
+// mixed deck from having to be split in two before it can be studied.
+std::vector<Ask> asks_for(const Flashcard& card, bool reversed) {
+  if (cloze::contains(card.question)) {
+    std::vector<Ask> asks;
+    for (const auto& blank : cloze::deletions(card.question)) {
+      Ask ask;
+      ask.shown = cloze::render(card.question, blank.group);
+      ask.expected = blank.answer;
+      ask.reveal = primary_answer(blank.answer);
+      ask.alternatives = alternatives_summary(blank.answer);
+      ask.spoken =
+          cloze::render(card.question, blank.group, cloze::Blank::kSpoken);
+      asks.push_back(ask);
+    }
+    return asks;
+  }
+
+  Ask ask;
+  if (reversed) {
+    // A question carries no "|" alternatives, so it is shown verbatim rather
+    // than having any pipe in it read as a separator.
+    ask.shown = primary_answer(card.answer);
+    ask.expected = card.question;
+    ask.reveal = card.question;
+    ask.spoken = ask.shown;
+    ask.label = "Your question: ";
+  } else {
+    ask.shown = card.question;
+    ask.expected = card.answer;
+    ask.reveal = primary_answer(card.answer);
+    ask.alternatives = alternatives_summary(card.answer);
+    ask.spoken = card.question;
+    ask.use_recording = true;
+  }
+  return {ask};
+}
+
+// The worst of what the blanks of one card earned, because the card is
+// scheduled once however many holes it has. Getting two of three right is not
+// a correct answer, and a hint taken on any of them is a hint taken.
+Outcome worse_of(Outcome a, Outcome b) {
+  if (a == Outcome::kIncorrect || b == Outcome::kIncorrect) {
+    return Outcome::kIncorrect;
+  }
+  if (a == Outcome::kPartial || b == Outcome::kPartial) {
+    return Outcome::kPartial;
+  }
+  return Outcome::kCorrect;
 }
 
 // The card itself, framed. Widths are measured in columns rather than bytes,
@@ -493,6 +576,24 @@ void print_correct_answer(const std::string& shown, const std::string& others) {
   std::cout << "\n";
 }
 
+// What a blank earned, in one line, so that a sentence with several holes can
+// show what happened to the ones already answered while the next is open.
+// Compact on purpose: this is a reminder, not the verdict, and the full verdict
+// still gets printed once the card is done.
+std::string blank_verdict(std::size_t blank, Outcome outcome,
+                          const std::string& reveal, const std::string& typed) {
+  const std::string label = "  blank " + std::to_string(blank + 1) + "  ";
+  if (outcome == Outcome::kCorrect) {
+    return std::string(color::green) + "  ✅" + label + reveal + color::reset;
+  }
+  if (outcome == Outcome::kPartial) {
+    return std::string(color::yellow) + "  ⚠️ " + label + reveal +
+           "  (hint)" + color::reset;
+  }
+  return std::string(color::red) + "  ❌" + label + reveal +
+         "  (you typed: " + typed + ")" + color::reset;
+}
+
 // What `?` reveals: the first character, with the shape of the rest. Spaces
 // are kept, so "la biblioteca" comes back as "l·  ··········" — enough to jog
 // the memory and to show how long the answer is, without giving it away.
@@ -520,7 +621,8 @@ enum class Action { kContinue, kUndo, kQuit };
 
 // Editing keeps the prompt open, so a card fixed on the spot can still have
 // its answer taken back in the same breath.
-Action prompt_next_action(Deck& deck, Flashcard& card) {
+Action prompt_next_action(Deck& deck, Flashcard& card,
+                          const std::string& spoken) {
   const bool audio_available = audio::available();
   while (true) {
     std::vector<KeyHint> hints = {{"Enter", "next card"}};
@@ -539,7 +641,7 @@ Action prompt_next_action(Deck& deck, Flashcard& card) {
     if (action == "q") return Action::kQuit;
     if (action == "u") return Action::kUndo;
     if (audio_available && action == "a") {
-      if (!audio::play(deck.audio_path(card), card.question)) {
+      if (!audio::play(deck.audio_path(card), spoken)) {
         std::cout << color::yellow << "No audio available for this card.\n"
                   << color::reset;
       }
@@ -666,10 +768,14 @@ void report_nothing_due(const Deck& deck, int today_days) {
 }  // namespace
 
 std::string prompt_text(const Flashcard& card, bool reversed) {
+  if (cloze::contains(card.question)) {
+    return cloze::render(card.question, cloze::kAllGroups);
+  }
   return reversed ? primary_answer(card.answer) : card.question;
 }
 
 std::string expected_answer(const Flashcard& card, bool reversed) {
+  if (cloze::contains(card.question)) return cloze::reveal(card.question);
   return reversed ? card.question : card.answer;
 }
 
@@ -716,91 +822,114 @@ void review_flashcards(Deck& deck) {
   size_t idx = 0;
   while (idx < matches.size()) {
     Flashcard& card = matches[idx].get();
-    const std::string expected = expected_answer(card, session.reversed);
-    const std::string question_label =
-        session.reversed ? "Your question: " : "Your answer: ";
+    const bool is_cloze = cloze::contains(card.question);
+    // A cloze card is asked forwards even in a reversed session, so it must not
+    // be labelled or logged as reversed. What the log records is how the card
+    // was actually asked, which is the only reading of that column that stays
+    // true when a mixed deck is studied backwards.
+    const bool asked_reversed = session.reversed && !is_cloze;
+    // One entry for an ordinary card, one per hole for a cloze one. Built here
+    // rather than inside the loop below so that "blank 2 of 3" knows what the
+    // 3 is before the first blank is asked.
+    const std::vector<Ask> asks = asks_for(card, session.reversed);
 
-    // "?" asks for a hint and "q" leaves the session. Both are unambiguous
-    // except on a card that actually accepts them as answers, and there the
-    // answer wins — asked through the real matcher rather than a string
-    // compare, so "?|question mark" is graded rather than hinted, and a vim
-    // deck can still be asked what `q` does. On such a card the key simply is
-    // not offered, and the legend says so; the session can still be ended from
-    // the prompt after the answer, which is never ambiguous.
-    const bool hint_available = !check_answer("?", expected).exact;
-    const bool quit_available = !check_answer("q", expected).exact;
-    // Audio is offered on the same terms, plus one more: there has to be
-    // something on this machine that can make a sound. What it plays is
-    // whatever is on screen, which is what keeps it from giving the answer
-    // away in a reversed session.
-    const bool audio_available =
-        audio::available() && !check_answer("a", expected).exact;
-    bool hinted = false;
-    bool audio_failed = false;
+    // What the blanks already answered earned, redrawn under the frame while
+    // the rest of the sentence is still being asked. Stays empty for a card
+    // with a single prompt, which has nothing to carry forward.
+    std::vector<std::string> earned;
+    // Starts at the best and is dragged down by the worst blank, because the
+    // card is scheduled once however many holes it has.
+    Outcome outcome = Outcome::kCorrect;
     bool quit_requested = false;
-    std::string typed;
-    while (true) {
-      clear_screen();
-      const std::string summary =
-          card_summary(card, today_days, session.reversed);
-      const std::string shown = prompt_text(card, session.reversed);
-      // Recomputed on every redraw rather than once per card, because the box
-      // depends on the terminal's size and the terminal can be resized between
-      // one keypress and the next.
-      const std::string picture_path = deck.image_path(card);
-      const image::Placement picture = card_image_box(picture_path);
-      // Two for the progress bar and its blank line, two for the prompt line
-      // and the breathing room above it.
-      centre_vertically(count_frame_lines(summary, shown, picture) + 4);
 
-      print_progress(idx + 1, matches.size());
-      std::cout << "\n";
-      print_card(summary, shown, picture_path, picture);
-      std::cout << "\n";
-      if (hinted) {
-        std::cout << color::yellow << "Hint: " << hint_for(expected) << "\n"
-                  << color::reset;
-      }
-      // Said on the redraw rather than at the moment of failure, because the
-      // redraw is what would have wiped it. A missing recording is not worth
-      // interrupting a review over; it is worth not leaving the user pressing
-      // a key that appears to do nothing.
-      if (audio_failed) {
-        std::cout << color::yellow << "No audio available for this card.\n"
-                  << color::reset;
-      }
+    for (std::size_t blank = 0; blank < asks.size(); ++blank) {
+      const Ask& ask = asks[blank];
 
-      std::vector<KeyHint> hints = {{"Enter", "submit"}};
-      if (audio_available) hints.push_back({"a", "play audio"});
-      if (hint_available && !hinted) hints.push_back({"?", "hint"});
-      if (quit_available) hints.push_back({"q", "end session"});
-      std::cout << legend(hints) << "\n";
+      // "?" asks for a hint and "q" leaves the session. Both are unambiguous
+      // except on a card that actually accepts them as answers, and there the
+      // answer wins — asked through the real matcher rather than a string
+      // compare, so "?|question mark" is graded rather than hinted, and a vim
+      // deck can still be asked what `q` does. On such a card the key simply
+      // is not offered, and the legend says so; the session can still be ended
+      // from the prompt after the answer, which is never ambiguous.
+      //
+      // Asked per blank, not per card: a cloze sentence may well have one hole
+      // whose answer is "?" and another whose answer is not.
+      const bool hint_available = !check_answer("?", ask.expected).exact;
+      const bool quit_available = !check_answer("q", ask.expected).exact;
+      // Audio is offered on the same terms, plus one more: there has to be
+      // something on this machine that can make a sound. What it plays is
+      // whatever is on screen, which is what keeps it from giving the answer
+      // away in a reversed session or from reading a cloze card's holes out.
+      const bool audio_available =
+          audio::available() && !check_answer("a", ask.expected).exact;
+      bool hinted = false;
+      bool audio_failed = false;
+      std::string typed;
+      while (true) {
+        clear_screen();
+        const std::string summary = card_summary(card, today_days,
+                                                 asked_reversed, blank,
+                                                 asks.size());
+        // Recomputed on every redraw rather than once per card, because the
+        // box depends on the terminal's size and the terminal can be resized
+        // between one keypress and the next.
+        const std::string picture_path = deck.image_path(card);
+        const image::Placement picture = card_image_box(picture_path);
+        // Two for the progress bar and its blank line, two for the prompt line
+        // and the breathing room above it, and one per blank already answered.
+        centre_vertically(count_frame_lines(summary, ask.shown, picture) + 4 +
+                          static_cast<int>(earned.size()));
 
-      typed = prompt(question_label);
-      const std::string command = to_lowercase(trim(typed));
-      if (audio_available && command == "a") {
-        audio_failed = !play_prompt(deck, card, session.reversed);
-        continue;  // same card, unanswered; playing is not an attempt
-      }
-      if (hint_available && !hinted && command == "?") {
-        hinted = true;
-        continue;  // same card, now with the hint on screen
-      }
-      if (quit_available && command == "q") {
-        // Left unanswered on purpose: walking away from a card must not be
-        // recorded as getting it wrong.
-        quit_requested = true;
-      }
-      break;
-    }
-    if (quit_requested) break;
+        print_progress(idx + 1, matches.size());
+        std::cout << "\n";
+        print_card(summary, ask.shown, picture_path, picture);
+        std::cout << "\n";
+        for (const auto& line : earned) std::cout << line << "\n";
+        if (hinted) {
+          std::cout << color::yellow << "Hint: " << hint_for(ask.expected)
+                    << "\n"
+                    << color::reset;
+        }
+        // Said on the redraw rather than at the moment of failure, because the
+        // redraw is what would have wiped it. A missing recording is not worth
+        // interrupting a review over; it is worth not leaving the user pressing
+        // a key that appears to do nothing.
+        if (audio_failed) {
+          std::cout << color::yellow << "No audio available for this card.\n"
+                    << color::reset;
+        }
 
-    const AnswerCheck check = check_answer(typed, expected);
-    bool counted_correct = check.exact;
-    if (counted_correct) {
-      std::cout << color::green << "\n✅ Correct!" << color::reset << "\n";
-    } else {
-      if (check.near_miss) {
+        std::vector<KeyHint> hints = {{"Enter", "submit"}};
+        if (audio_available) hints.push_back({"a", "play audio"});
+        if (hint_available && !hinted) hints.push_back({"?", "hint"});
+        if (quit_available) hints.push_back({"q", "end session"});
+        std::cout << legend(hints) << "\n";
+
+        typed = prompt(ask.label);
+        const std::string command = to_lowercase(trim(typed));
+        if (audio_available && command == "a") {
+          audio_failed =
+              !play_prompt(deck, card, ask.use_recording, ask.spoken);
+          continue;  // same blank, unanswered; playing is not an attempt
+        }
+        if (hint_available && !hinted && command == "?") {
+          hinted = true;
+          continue;  // same blank, now with the hint on screen
+        }
+        if (quit_available && command == "q") {
+          // Left unanswered on purpose: walking away from a card must not be
+          // recorded as getting it wrong. A cloze card walked away from
+          // half-finished is not recorded at all, for the same reason.
+          quit_requested = true;
+        }
+        break;
+      }
+      if (quit_requested) break;
+
+      const AnswerCheck check = check_answer(typed, ask.expected);
+      bool counted_correct = check.exact;
+      if (!counted_correct && check.near_miss) {
         std::cout << color::yellow
                   << "\n⚠️  Close! The correct answer is: " << check.closest
                   << "\n   (You typed: " << typed << ")\n"
@@ -815,20 +944,51 @@ void review_flashcards(Deck& deck) {
           counted_correct = true;
         }
       }
-      if (!counted_correct) {
-        // A question has no "|" alternatives, so a reversed session shows it
-        // verbatim rather than treating any pipe in it as a separator.
-        print_correct_answer(
-            session.reversed ? card.question : primary_answer(card.answer),
-            session.reversed ? std::string() : alternatives_summary(card.answer));
+
+      // Producing the answer only after being shown its first letter is a
+      // partial, not a clean recall: it holds the box rather than advancing it.
+      const Outcome blank_outcome = !counted_correct ? Outcome::kIncorrect
+                                    : hinted         ? Outcome::kPartial
+                                                     : Outcome::kCorrect;
+      outcome = worse_of(outcome, blank_outcome);
+
+      if (asks.size() > 1) {
+        earned.push_back(
+            blank_verdict(blank, blank_outcome, ask.reveal, trim(typed)));
+      } else if (counted_correct) {
+        std::cout << color::green << "\n✅ Correct!" << color::reset << "\n";
+      } else {
+        print_correct_answer(ask.reveal, ask.alternatives);
       }
     }
+    if (quit_requested) break;
 
-    // Producing the answer only after being shown its first letter is a
-    // partial, not a clean recall: it holds the box rather than advancing it.
-    const Outcome outcome = !counted_correct ? Outcome::kIncorrect
-                            : hinted         ? Outcome::kPartial
-                                             : Outcome::kCorrect;
+    if (is_cloze) {
+      // The whole card at once, now that every hole has been filled. The lines
+      // under the frame only ever covered the blanks before the last one, so
+      // this is the first place the card can be read as a whole -- which is
+      // the thing a cloze card is actually for.
+      if (earned.size() > 1) {
+        std::cout << "\n";
+        for (const auto& line : earned) std::cout << line << "\n";
+      }
+      std::cout << color::cyan << "\n" << cloze::reveal(card.question) << "\n"
+                << color::reset;
+    }
+
+    // A card with one prompt has already said how it went, in the line right
+    // above. One with several has only said how each blank went, so the thing
+    // that actually happened -- what the *card* earned -- has to be said out
+    // loud, or the schedule underneath looks as though it came from nowhere.
+    if (asks.size() > 1 && outcome == Outcome::kCorrect) {
+      std::cout << color::green << "\n✅ Every blank correct!" << color::reset
+                << "\n";
+    } else if (asks.size() > 1 && outcome == Outcome::kIncorrect) {
+      std::cout << color::red
+                << "\n❌ Counted as incorrect — a sentence is only right when "
+                   "every blank is.\n"
+                << color::reset;
+    }
     if (outcome == Outcome::kPartial) {
       std::cout << color::yellow
                 << "Counted as a partial — the hint means this card stays "
@@ -844,17 +1004,23 @@ void review_flashcards(Deck& deck) {
     autosave(deck);
     // Logged as soon as it happens rather than once the user moves on, so
     // that closing the terminal at the prompt below cannot leave an answer
-    // that the counters kept but the log never saw.
+    // that the counters kept but the log never saw. One event per card, not
+    // one per blank: the log records what a card was scheduled on, and a cloze
+    // card is scheduled once.
     const std::string answer_id =
-        log_answer(deck, card, session.reversed, outcome, result, &log_warned);
+        log_answer(deck, card, asked_reversed, outcome, result, &log_warned);
 
-    const Action action = prompt_next_action(deck, card);
+    // Nothing is left to give away by now, so the key that reads the card out
+    // reads all of it: a cloze sentence with its holes filled in, and in a
+    // reversed session the question that was just revealed.
+    const Action action = prompt_next_action(
+        deck, card, is_cloze ? cloze::reveal(card.question) : card.question);
     if (action == Action::kUndo) {
       restore_state(&card, before);
       --tally.bucket_for(outcome);
       autosave(deck);
       log_undo(deck, card, answer_id, &log_warned);
-      continue;  // same card, asked again
+      continue;  // same card, asked again from its first blank
     }
     ++idx;  // this card is done either way; quitting does not un-answer it
     if (action == Action::kQuit) break;

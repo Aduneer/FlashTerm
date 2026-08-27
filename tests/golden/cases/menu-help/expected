@@ -1,0 +1,65 @@
+--- output ---
+Loaded 1 flashcards from deck.txt
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (1 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> Menu
+  Menu choices take a single keypress — no Enter. Typed answers,
+  searches and file paths still read a whole line.
+1 - Add flashcard
+2 - Review flashcards (Due now, All, by Tags, by Difficulty, or by Leitner Box)
+3 - Manage flashcards (list/edit/delete)
+4 - Display progress & statistics
+5 - Import flashcards (.csv/.txt)
+6 - Export flashcards (.csv)
+7 - Manage Tags (list all unique tags)
+0 - Save and exit
+h/? - Show this help screen
+
+Card types
+  Wrap a word in {{braces}} and the card becomes a sentence with a
+  hole in it, answered by filling the hole in. Such a card needs no
+  answer column: its answers are the words in the braces.
+
+At the answer prompt
+  [?] hint — reveals the first letter; counts as a partial
+  [q] end the session and go back to the menu
+  Both are ignored on a card that accepts them as answers, so a
+  deck of vim keys or regex metacharacters still works.
+
+After answering
+  [Enter] next card
+  [e] edit the card you are looking at
+  [u] undo the answer you just gave
+  [q] end the session and go back to the menu
+
+Anywhere
+  [Ctrl+C] save and exit
+  Nothing is ever lost by leaving: the deck is saved after every
+  answer and every edit.
+
+
+--- FlashTerm · deck.txt ---
+[1] Add flashcard
+[2] Review flashcards  (1 due)
+[3] Manage flashcards
+[4] Display progress
+[5] Import flashcards
+[6] Export flashcards
+[7] List unique tags
+[h] Help
+[0] Save and exit
+> Flashcards saved. Goodbye!
+--- exit status ---
+0
+--- file deck.txt ---
+Bonjour,Hello,french

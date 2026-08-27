@@ -71,6 +71,7 @@ any file from `examples/`:
 | `nato-phonetic.csv` | The phonetic alphabet, all 26 |
 | `spanish.csv`, `japanese.csv` | Vocabulary, foreign → English |
 | `colores.csv` | Colours, English → Spanish, **with pictures** |
+| `cloze-science.csv` | Sentences with the word taken out, **fill in the blank** |
 | `general-knowledge.csv` | A bit of everything |
 
 Imported cards arrive in Box 1 and are due immediately. Most of the examples are
@@ -96,6 +97,10 @@ FlashTerm ~/spanish.txt --generate-audio --voice es_ES-davefx-medium
 
 `ja_JA-hi_fi_captain-medium` does the same for `japanese.csv`, though Japanese
 needs one extra package first — see [docs/audio.md](docs/audio.md).
+
+`cloze-science.csv` is the one to copy if you want [fill-in-the-blank
+cards](#cloze-deletion). It has no answer column at all: the answers are the
+words in `{{braces}}` inside each sentence.
 
 `colores.csv` is the exception, and the one to copy if you want [pictures](#images):
 each card carries a colour swatch from `examples/images/`. It also runs
@@ -127,6 +132,7 @@ that asks, not the side that answers.
 * **Undo and fix in place** — After each answer, `u` takes it back — box, scores and due date restored exactly — and `e` edits the card on the spot, which is when you actually notice a bad question. Editing keeps the prompt open, so you can fix a card and *then* undo the answer it cost you.
 * **Custom decks via CLI** — `./FlashTerm vocabulary.txt` loads any deck file; the default is `flashcards.txt`, or whatever `FLASHTERM_DECK` points at.
 * **Works with the sync tool you already have** — Decks are plain text and saves are atomic, so Syncthing, Dropbox, `rsync` or git sync a deck between machines with no support needed from FlashTerm. And when two machines review before they sync, `--absorb-conflicts` merges the conflict copy your sync tool left behind back into the review log and puts the scheduling it recorded back on the cards. See [Syncing Between Machines](#syncing-between-machines).
+* **Cloze deletion** — Wrap a word in `{{braces}}` and the card becomes a sentence with a hole in it: `The {{mitochondrion}} is the powerhouse of the cell` asks `The [...] is the powerhouse of the cell`. The answer column is empty, because the answers are inside the question — so a deck of them is a file of bare sentences. Anki's syntax, including numbered blanks and per-blank hints, so decks paste across in both directions. A sentence with several holes is asked one hole at a time and scheduled *once*, on the worst of the answers. See [Cloze Deletion](#cloze-deletion).
 * **Images** — A card can name a picture in the deck's eleventh column, drawn inside the card frame. Terminals that speak the kitty graphics protocol (kitty, Ghostty) need nothing installed at all; everything else draws it as coloured text blocks via [chafa](https://hpjansson.org/chafa/), which works even over `ssh` and inside `tmux`. Aspect ratio is preserved and the picture is fitted to the frame, so a panorama and a portrait both land inside the borders. A deck of pictures still reviews as plain text anywhere that cannot draw them. See [Images](#images).
 * **Deck statistics** — Success rates, review counts, a box-by-box mastery breakdown with ASCII bars, automatic flagging of your hardest card, and how much you reviewed today alongside your current daily streak.
 * **Review log** — Every answer is appended to a `deck.txt.log` beside the deck: what was asked, which way round, whether you got it, and when, to the second. The card counters say what a card's state *is*; the log says what actually happened, which is what streaks, retention over time and merging two machines' reviews all need. It is append-only, so it never rewrites history and never conflicts.
@@ -217,6 +223,10 @@ so a deck and the audio directory beside it can be moved or synced as one thing.
 
 `image` is a picture for the card, resolved the same way. See [Images](#images).
 
+A card whose question holds `{{braces}}` is a
+[cloze card](#cloze-deletion): its answers are the words in the braces, its
+answer column is empty, and it needs no other column at all.
+
 **Every card is written only as far as the last column it actually uses**, so a
 deck of plain `question,answer,tags` rows — which is what the examples are, and
 what you get writing one by hand — is saved back in that form rather than
@@ -268,7 +278,9 @@ c9072b87405e0369,2fb76783d6b65f93,2026-08-17T09:50:49Z,n,correct,1,2,
 * `timestamp` is UTC to the second, so events from two machines sort into one
   order regardless of timezone. Due dates stay whole days; only the log is
   finer-grained than that.
-* `direction` is `n` for a normal prompt and `r` for a reversed one.
+* `direction` is `n` for a normal prompt and `r` for a reversed one. A
+  [cloze card](#cloze-deletion) is always `n`: it is asked forwards even in a
+  reversed session.
 * `result` is `correct`, `partial`, `incorrect`, or `undo`. A `partial` is an
   answer that needed the hint. An answer you take back with `u` is *recorded*
   as undone rather than erased — a line that may already have been synced
@@ -277,6 +289,112 @@ c9072b87405e0369,2fb76783d6b65f93,2026-08-17T09:50:49Z,n,correct,1,2,
 
 Losing or deleting the log costs you the history, not the deck: cards keep
 their own counters and schedule.
+
+## Cloze Deletion
+
+Wrap a word in `{{braces}}` and the card becomes a sentence with a hole in it:
+
+```
+The {{mitochondrion}} is the powerhouse of the cell,,biology
+```
+
+```
+┌──────────────────────────────────────────┐
+│ Box 1  ·  new  ·  biology                │
+├──────────────────────────────────────────┤
+│                                          │
+│   The [...] is the powerhouse of the cell│
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+You type `mitochondrion`; the finished sentence is shown back to you. This is a
+way of *writing* a card, not a new kind of card: it has one Leitner box, one id
+and one due date like every other, and everything else — tags, boxes, the hint
+key, undo, the log — works on it unchanged.
+
+**The answer column is empty**, because the answers are inside the question. A
+cloze card is therefore a whole card on one field, so a deck of them is a file
+of bare sentences with no commas in sight — and it is written back exactly that
+way, never expanded to `sentence,,`. A sentence that *does* contain a comma has
+to be quoted, like any other CSV field:
+
+```
+Water boils at {{100}} °C at sea level
+"{{Photosynthesis}} turns light, water and carbon dioxide into sugar"
+```
+
+### The syntax
+
+It is Anki's, so decks paste across in both directions.
+
+| Written | Means |
+| --- | --- |
+| `{{text}}` | One blank |
+| `{{c1::text}}` | The same, numbered |
+| `{{c1::text::hint}}` | With a nudge shown in place of the blank |
+
+`text` may list alternatives with `|` exactly as an answer column does, so
+`{{c1::powerhouse|mitochondrion}}` accepts either.
+
+**Numbers group blanks and order them.** Repeating a number makes two places in
+the sentence into one blank, opened and answered together:
+
+```
+{{c1::Nitrogen}} makes up most of the air we breathe; {{c1::nitrogen}} also fills a bag of crisps
+```
+
+An unnumbered blank takes the lowest number nothing else has claimed, in the
+order it appears — so a sentence that numbers nothing is asked left to right,
+and one that numbers everything is asked in the order it asked for.
+
+**A hint is only looked for after a `cN::`,** which is what lets the short form
+hold an answer with a `::` in it:
+
+```
+Use {{std::vector}} for a dynamic array         → answer "std::vector"
+Use {{c1::std::vector}} for a dynamic array     → answer "std", hint "vector"
+Use {{c1::std::vector::}} for a dynamic array   → answer "std::vector", no hint
+```
+
+A `{{` with no closing `}}`, or one with nothing inside it to answer, is not a
+deletion: that card stays an ordinary card and its braces are shown as written.
+
+### Several blanks in one sentence
+
+They are asked one at a time, within a single presentation of the card. Each
+blank you finish is filled in for the next one, and what it earned stays on
+screen underneath:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Box 1  ·  new  ·  geography  ·  blank 2 of 3             │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│   Paris is the capital of [...], on the [river]          │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+
+  ✅  blank 1  Paris
+```
+
+**The card is then scheduled once, on the worst of the answers** — so a
+three-blank sentence cannot promote a card three boxes in one sitting, and one
+missed blank counts the sentence wrong. One review, one log event, whatever the
+sentence is made of.
+
+### What cloze cards do not do
+
+* **They are never asked reversed.** A reversed session shows the answer and
+  asks for the question; a cloze card's answers are already inside its
+  question, so there is nothing to turn round. Such cards are asked forwards in
+  a reversed session — which is also what lets a mixed deck be studied
+  backwards without splitting it in two first — and the log records them as
+  `n`, because that is how they were actually asked.
+* **`--generate-audio` skips them.** A recording is of the question, and a
+  cloze question read aloud is the answer read aloud. The `a` key still works
+  during review: it reads the sentence with the open blank spoken as the word
+  "blank", and reads the whole thing once the card is done.
 
 ## Audio
 
@@ -643,6 +761,7 @@ cannot drive an app that insists on a tty.
 | --- | --- |
 | `src/flashcard.*` | The `Flashcard` model |
 | `src/answer.*` | Accepted-answer alternatives and typo-tolerant matching |
+| `src/cloze.*` | Fill-in-the-blank cards: parsing `{{deletions}}` and rendering a sentence with one open |
 | `src/date.*` | Civil-calendar arithmetic and due-date formatting |
 | `src/schedule.*` | Box intervals, due checks, and the Leitner move for an answer |
 | `src/text.*` | String, CSV and UTF-8 column helpers (no I/O) |

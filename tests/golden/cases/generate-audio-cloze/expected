@@ -1,0 +1,15 @@
+--- output ---
+Rendering audio for 2 cards in deck.txt
+  rendered  audio/<ID1>.wav  Bonjour
+  skipped   The {{c1::mitochondrion}} is the powerhouse  (cloze)
+
+1 rendered, 1 skipped, 0 failed
+--- exit status ---
+0
+--- file audio/<ID1>.wav ---
+Bonjour
+--- file deck.txt ---
+Bonjour,Hello,french,0,0,1,,,<ID1>,audio/<ID1>.wav
+The {{c1::mitochondrion}} is the powerhouse,,biology,0,0,1,,,<ID2>
+--- file played.txt ---
+render: audio/<ID1>.wav

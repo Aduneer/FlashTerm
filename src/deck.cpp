@@ -11,6 +11,7 @@
 #include <sstream>
 #include <utility>
 
+#include "cloze.h"
 #include "date.h"
 #include "schedule.h"
 #include "text.h"
@@ -116,8 +117,15 @@ std::string card_to_csv(const Flashcard& card) {
   // empty. Three columns is the documented short form of a deck, and a
   // two-column line, though it would read back correctly, is not a shape
   // anything else in the project produces.
-  std::size_t last = 2;
-  for (std::size_t i = 3; i < count; ++i) {
+  //
+  // A cloze card is the one exception to the three-column floor: its answers
+  // live inside its question, so its answer column has nothing to hold and a
+  // hand-written cloze deck is a file of bare sentences. Writing that back as
+  // "sentence,," would change every line of it on the first save, which is the
+  // very thing this rule exists to prevent.
+  const std::size_t minimum = cloze::contains(card.question) ? 0 : 2;
+  std::size_t last = minimum;
+  for (std::size_t i = minimum + 1; i < count; ++i) {
     if (columns[i] != kAbsent[i]) last = i;
   }
 
@@ -130,7 +138,20 @@ std::string card_to_csv(const Flashcard& card) {
 
 bool card_from_csv(const std::string& line, Flashcard* out) {
   std::vector<std::string> fields = parse_csv_line(without_cr(line));
-  if (fields.size() < 2) return false;  // needs at least a question and answer
+  // Needs at least a question and an answer -- unless the question is a cloze
+  // sentence, which carries its answers inside itself and so is a whole card
+  // on its own.
+  //
+  // Tested for a real deletion rather than accepting any single field: without
+  // that, every line of every text file would be a card, and the rule that
+  // keeps a mistyped path from being overwritten depends on most lines not
+  // being ones. A comma still separates columns in a bare cloze line, so a
+  // sentence containing one has to be quoted like any other field.
+  if (fields.empty()) return false;
+  if (fields.size() < 2) {
+    if (!cloze::contains(fields[0])) return false;
+    fields.push_back("");
+  }
 
   const std::string tags_str = (fields.size() >= 3) ? fields[2] : "";
   int leitner = parse_int_or(fields, 5, 1);

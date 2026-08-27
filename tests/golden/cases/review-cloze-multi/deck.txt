@@ -1,0 +1,1 @@
+"{{c1::Paris}} is the capital of {{c2::France}}, and {{c1::Paris}} sits on the {{c3::Seine::river}}",,geography

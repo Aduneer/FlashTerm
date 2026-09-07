@@ -324,13 +324,12 @@ LogStats summarize(const std::vector<ReviewEvent>& events, int today_days) {
   const std::set<std::string> undone = undone_ids(events);
 
   LogStats stats;
-  std::set<int> active_days;
   for (const auto& event : events) {
     if (event.is_undo() || undone.count(event.id) > 0) continue;
 
     const int day = local_day_of(event.timestamp);
     if (day == kNoDate) continue;
-    active_days.insert(day);
+    ++stats.reviews_by_day[day];
 
     if (day == today_days) {
       ++stats.reviewed_today;
@@ -341,8 +340,8 @@ LogStats summarize(const std::vector<ReviewEvent>& events, int today_days) {
 
   // Today is still in progress, so an empty today does not end a streak that
   // ran through yesterday. Two empty days in a row does.
-  int day = (active_days.count(today_days) > 0) ? today_days : today_days - 1;
-  while (active_days.count(day) > 0) {
+  int day = (stats.reviews_by_day.count(today_days) > 0) ? today_days : today_days - 1;
+  while (stats.reviews_by_day.count(day) > 0) {
     ++stats.current_streak;
     --day;
   }

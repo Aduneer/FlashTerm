@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
@@ -395,6 +396,43 @@ void list_unique_tags(const Deck& deck) {
   std::cout << "\n";
 }
 
+std::string contribution_heatmap(const LogStats& stats, int today_days,
+                                 int width) {
+  std::ostringstream out;
+  out << color::cyan << "--- Review Activity ---\n" << color::reset;
+
+  const int weeks = std::clamp((width - 6) / 2, 1, 12);
+  // 1970-01-01 was Thursday. Normalize the remainder for pre-epoch dates.
+  const int weekday = ((today_days % 7 + 3) % 7 + 7) % 7;
+  const int start = today_days - weekday - (weeks - 1) * 7;
+  out << "  " << format_date(start) << " to " << format_date(today_days)
+      << "\n";
+  const char* days[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+  for (int row = 0; row < 7; ++row) {
+    out << "  " << days[row] << " ";
+    for (int week = 0; week < weeks; ++week) {
+      if (week > 0) out << " ";
+      const int day = start + week * 7 + row;
+      if (day > today_days) {
+        out << " ";
+        continue;
+      }
+      const auto found = stats.reviews_by_day.find(day);
+      const int count = found == stats.reviews_by_day.end() ? 0 : found->second;
+      const char* cell = count == 0 ? "·" : count < 5 ? "░" : count < 10 ? "▒"
+                                        : count < 20 ? "▓" : "█";
+      if (count > 0) out << color::green;
+      out << cell;
+      if (count > 0) out << color::reset;
+    }
+    out << "\n";
+  }
+  out << "  Reviews/day (local time):\n"
+      << "  · 0   ░ 1–4   ▒ 5–9\n"
+      << "  ▓ 10–19   █ 20+\n\n";
+  return out.str();
+}
+
 void display_progress(const Deck& deck) {
   if (deck.empty()) {
     std::cout << color::yellow << "No flashcards to display progress for.\n\n"
@@ -431,6 +469,8 @@ void display_progress(const Deck& deck) {
               << format_date(stats.next_due) << ")\n";
   }
   std::cout << "\n";
+
+  std::cout << contribution_heatmap(log_stats, today_days, terminal_width());
 
   std::cout << color::cyan << "--- Leitner Box Distribution ---\n"
             << color::reset;

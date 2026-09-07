@@ -22,6 +22,19 @@ Loaded 2 flashcards from deck.txt
   Reviewed Today:       0 (0 Correct, 0 Incorrect)
   Current Streak:       0 days
 
+--- Review Activity ---
+  <DATE1> to <DATE2>
+  Mon · · · · · · · · · · · <DAY>
+  Tue · · · · · · · · · · · <DAY>
+  Wed · · · · · · · · · · · <DAY>
+  Thu · · · · · · · · · · · <DAY>
+  Fri · · · · · · · · · · · <DAY>
+  Sat · · · · · · · · · · · <DAY>
+  Sun · · · · · · · · · · · <DAY>
+  Reviews/day (local time):
+  · 0   ░ 1–4   ▒ 5–9
+  ▓ 10–19   █ 20+
+
 --- Leitner Box Distribution ---
   Box 1 (Weakest): [██████████] 2 cards (100%), every 1d
   Box 2:           [░░░░░░░░░░] 0 cards (0%), every 3d

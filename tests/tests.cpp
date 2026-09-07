@@ -2278,6 +2278,9 @@ void test_summarize() {
   EXPECT_EQ(stats.reviewed_today, 3);
   EXPECT_EQ(stats.correct_today, 2);
   EXPECT_EQ(stats.current_streak, 3);
+  EXPECT_EQ(stats.reviews_by_day.at(today_days), 3);
+  EXPECT_EQ(stats.reviews_by_day.at(today_days - 1), 1);
+  EXPECT_EQ(stats.reviews_by_day.count(today_days - 3), 0u);
 
   // A gap ends the streak: the run before it is history, not part of today's.
   events.push_back(answer_event("card2", stamp_on_day(today_days - 4), true, 1, 2));
@@ -2309,10 +2312,52 @@ void test_summarize() {
   stats = summarize(events, today_days);
   EXPECT_EQ(stats.reviewed_today, 2);
   EXPECT_EQ(stats.correct_today, 1);
+  EXPECT_EQ(stats.reviews_by_day.at(today_days), 2);
+
+  ReviewEvent invalid = answer_event("card1", "nonsense", true, 1, 2);
+  events.push_back(invalid);
+  EXPECT_TRUE(summarize(events, today_days).reviews_by_day == stats.reviews_by_day);
 
   stats = summarize({}, today_days);
   EXPECT_EQ(stats.reviewed_today, 0);
   EXPECT_EQ(stats.current_streak, 0);
+  EXPECT_TRUE(stats.reviews_by_day.empty());
+}
+
+void test_contribution_heatmap() {
+  const int day = parse_date("2024-03-01");  // Friday, following leap day.
+  LogStats stats;
+  const std::string empty = contribution_heatmap(stats, day, 10);
+  EXPECT_TRUE(empty.find("--- Review Activity ---\n") != std::string::npos);
+  EXPECT_TRUE(empty.find("2024-02-19 to 2024-03-01") != std::string::npos);
+  EXPECT_TRUE(empty.find("  Mon · ·\n") != std::string::npos);
+  EXPECT_TRUE(empty.find("  Fri · ·\n") != std::string::npos);
+  EXPECT_TRUE(empty.find("  Sat ·  \n") != std::string::npos);
+  EXPECT_TRUE(empty.find("  Sun ·  \n") != std::string::npos);
+  stats.reviews_by_day = {{day - 4, 1}, {day - 3, 4}, {day - 2, 5},
+                         {day - 1, 10}, {day, 20}, {day + 1, 99},
+                         {day - 7, 9}, {day - 80, 20}};
+  const std::string chart = contribution_heatmap(stats, day, 10);
+  EXPECT_TRUE(chart.find("2024-02-19 to 2024-03-01") != std::string::npos);
+  EXPECT_TRUE(chart.find("  Mon · ░\n") != std::string::npos);
+  EXPECT_TRUE(chart.find("  Tue · ░\n") != std::string::npos);
+  EXPECT_TRUE(chart.find("  Wed · ▒\n") != std::string::npos);
+  EXPECT_TRUE(chart.find("  Thu · ▓\n") != std::string::npos);
+  EXPECT_TRUE(chart.find("  Fri ▒ █\n") != std::string::npos);
+  EXPECT_TRUE(chart.find("  Sat ·  \n") != std::string::npos);
+  EXPECT_TRUE(chart.find("  Sun ·  \n") != std::string::npos);
+  EXPECT_TRUE(contribution_heatmap(stats, day, 80).find("2023-12-11 to 2024-03-01")
+              != std::string::npos);
+  const int sunday = parse_date("2024-03-03");
+  stats.reviews_by_day[sunday] = 19;
+  EXPECT_TRUE(contribution_heatmap(stats, sunday, 8).find("  Sun ▓\n")
+              != std::string::npos);
+  const int monday = parse_date("2024-03-04");
+  EXPECT_TRUE(contribution_heatmap(stats, monday, 8).find("  Tue  \n")
+              != std::string::npos);
+  stats.reviews_by_day = {{-1, 1}};  // Wednesday before the epoch.
+  EXPECT_TRUE(contribution_heatmap(stats, -1, 8).find("  Wed ░\n")
+              != std::string::npos);
 }
 
 void test_card_ids() {
@@ -2575,6 +2620,7 @@ void test_partial_events() {
   EXPECT_EQ(stats.reviewed_today, 2);
   EXPECT_EQ(stats.correct_today, 1);
   EXPECT_EQ(stats.hinted_today, 1);
+  EXPECT_EQ(stats.reviews_by_day.at(today_days), 2);
 }
 
 void test_review_keys_do_not_shadow_answers() {
@@ -2717,6 +2763,7 @@ int main() {
   test_card_image_column();
   test_shipped_example_decks();
   test_summarize();
+  test_contribution_heatmap();
   test_card_ids();
   test_save_leaves_an_unchanged_deck_alone();
   test_wrap();

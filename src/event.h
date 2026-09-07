@@ -131,6 +131,8 @@ std::vector<ReviewEvent> merge_events(const std::vector<ReviewEvent>& a,
 std::map<std::string, CardState> replay(const std::vector<ReviewEvent>& events);
 
 struct LogStats {
+  // Completed answers per local calendar day, excluding undone answers.
+  std::map<int, int> reviews_by_day;
   int reviewed_today = 0;
   int correct_today = 0;
   // Answers that needed the hint. Counted separately because "got it, but only

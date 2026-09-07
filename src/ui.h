@@ -68,6 +68,10 @@ void add_flashcard(Deck& deck);
 void manage_flashcards(Deck& deck);
 void list_flashcards(const Deck& deck);
 void list_unique_tags(const Deck& deck);
+// Monday-first calendar, oldest week on the left, ending with this week.
+// Width limits the number of weeks (up to 12); future days are blank.
+std::string contribution_heatmap(const LogStats& stats, int today_days,
+                                 int width);
 void display_progress(const Deck& deck);
 void print_help();
 }  // namespace FlashTerm

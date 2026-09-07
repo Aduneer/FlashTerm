@@ -7,6 +7,12 @@ detail, which is where the reasoning lives.
 
 ### Added
 
+- **Review Activity heatmap.** The progress screen shows up to 12 weeks of
+  reviews by local day, with Monday–Sunday rows and five shading levels that
+  also work without colour. Undone answers are excluded, future days stay
+  blank, and narrower terminals show fewer weeks. The calendar also appears
+  when there is no review history yet.
+
 - **Cloze deletion.** Wrap a word in `{{braces}}` and the card becomes a
   sentence with a hole in it:
 

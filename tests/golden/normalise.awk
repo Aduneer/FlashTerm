@@ -90,6 +90,12 @@ function collapse_cursor(line,   out, token, n) {
 
 {
   line = $0
+  # Only the last week changes with the weekday of the test run: its future
+  # cells are blank. Fixed-date unit tests check those cells and their shading.
+  if (line == "--- Review Activity ---") heatmap = 1
+  if (heatmap && line ~ /^  (Mon|Tue|Wed|Thu|Fri|Sat|Sun) /)
+    sub(/(·|░|▒|▓|█| )$/, "<DAY>", line)
+  if (line == "  Reviews/day (local time):") heatmap = 0
   line = collapse_graphics(line)
   line = collapse_cursor(line)
   gsub(/\r/, "<CR>", line)
